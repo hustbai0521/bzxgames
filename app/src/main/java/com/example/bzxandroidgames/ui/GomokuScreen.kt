@@ -3,6 +3,7 @@ package com.example.bzxandroidgames.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -52,8 +53,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -68,14 +71,25 @@ import com.example.bzxandroidgames.game.Gomoku
 import com.example.bzxandroidgames.game.GomokuDifficulty
 import com.example.bzxandroidgames.game.GomokuMode
 import com.example.bzxandroidgames.game.GomokuUiState
-import com.example.bzxandroidgames.ui.theme.GamePalette
-import com.example.bzxandroidgames.ui.theme.GameTheme
-import com.example.bzxandroidgames.ui.theme.LocalGamePalette
-import com.example.bzxandroidgames.ui.theme.NatureBackdrop
-import com.example.bzxandroidgames.ui.theme.ThemePicker
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+// Fixed ink-and-wood palette: the gomoku screen always looks like a classic wooden
+// goban on rice paper, independent of the 2048 theme.
+private val Paper = Color(0xFFFBF6E9)
+private val PaperDeep = Color(0xFFF1E9D4)
+private val InkText = Color(0xFF33291C)
+private val InkMuted = Color(0xFF8A7A60)
+private val Seal = Color(0xFFB23A2E)
+private val WoodFrame = listOf(Color(0xFF7C5527), Color(0xFF95692F), Color(0xFF5E3F1B))
+private val Wood = listOf(Color(0xFFECCB8C), Color(0xFFDCB26A), Color(0xFFC6994E))
+private val Grain = Color(0xFF9A7031)
+private val GridInk = Color(0xFF42301B)
+private val Slate = listOf(Color(0xFF5E6878), Color(0xFF1A1E28), Color(0xFF06080D))
+private val Clam = listOf(Color(0xFFFFFFFF), Color(0xFFF5EEDC), Color(0xFFD8CCA5))
+private val ClamRim = Color(0xFFB6A87F)
+private val WhiteSide = Color(0xFFA08D62)
 
 @Composable
 fun GomokuScreen(
@@ -85,23 +99,21 @@ fun GomokuScreen(
     onPlay: (Int) -> Unit,
     onUndo: () -> Unit,
     onRestart: () -> Unit,
-    onThemeChange: (GameTheme) -> Unit,
     onBack: () -> Unit
 ) {
-    val palette = LocalGamePalette.current
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(palette.background))
+            .background(Brush.verticalGradient(listOf(Paper, PaperDeep, Color(0xFFE8DCC0))))
     ) {
-        if (palette.isNature) NatureBackdrop() else GomokuBackdrop()
+        InkWashBackdrop()
         Column(
             modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 480.dp).fillMaxSize()
                 .systemBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(22.dp))
-            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text("‹  返回游戏大厅", color = palette.primary) }
+            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text("‹  返回游戏大厅", color = Seal) }
             GomokuHeader(state, onUndo, onRestart)
             Spacer(Modifier.height(18.dp))
             ModePicker(state.mode, onSelectMode)
@@ -111,21 +123,16 @@ fun GomokuScreen(
                     DifficultyPicker(state.difficulty, onSelectDifficulty)
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            ThemePicker(palette.theme, onThemeChange)
             Spacer(Modifier.height(20.dp))
-            Text(
-                if (palette.isNature) "黑白手谈 · 方寸之间" else "GOMOKU · PLACE AND LINK FIVE",
-                color = palette.mutedText, fontSize = 10.sp, letterSpacing = 2.sp
-            )
+            Text("手谈方圆 · 水墨木韵", color = InkMuted, fontSize = 10.sp, letterSpacing = 2.sp)
             Spacer(Modifier.height(17.dp))
             GomokuBoard(state, onPlay)
             Spacer(Modifier.height(18.dp))
             GomokuHint(state)
             Spacer(Modifier.height(24.dp))
             Text(
-                if (palette.isNature) "轻点交点落子，率先连成五子者胜" else "TAP AN INTERSECTION  /  FIVE IN A ROW WINS",
-                color = palette.mutedText,
+                "轻点交点落子 · 连成五子者胜",
+                color = InkMuted,
                 fontSize = 9.sp,
                 letterSpacing = 1.4.sp,
                 modifier = Modifier.padding(bottom = 18.dp)
@@ -138,46 +145,114 @@ fun GomokuScreen(
     }
 }
 
+/** Rice-paper world behind the board: a faint enso circle, ink-wash mountains and a branch. */
 @Composable
-private fun GomokuBackdrop() {
-    val palette = LocalGamePalette.current
+private fun InkWashBackdrop() {
+    val motion = rememberInfiniteTransition(label = "ink-mist")
+    val mist by motion.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(24000, easing = LinearEasing)),
+        label = "mist-drift"
+    )
     Canvas(Modifier.fillMaxSize()) {
-        val step = 46.dp.toPx()
-        var x = 0f
-        while (x < size.width) {
-            drawLine(palette.primary.copy(alpha = .05f), Offset(x, 0f), Offset(x, size.height), 1f)
-            x += step
+        val w = size.width
+        val h = size.height
+
+        drawCircle(
+            Color(0xFF4A3B28).copy(alpha = .05f),
+            min(w, h) * .42f,
+            Offset(w * .5f, h * .4f),
+            style = Stroke(12.dp.toPx())
+        )
+
+        inkMountain(h * .68f, .11f, Color(0xFF5A5044))
+        inkMountain(h * .72f, .07f, Color(0xFF6B6152))
+
+        val ink = Color(0xFF4A3B28)
+        drawPath(
+            Path().apply {
+                moveTo(-4.dp.toPx(), h * .1f)
+                cubicTo(w * .14f, h * .065f, w * .19f, h * .15f, w * .28f, h * .12f)
+            },
+            ink.copy(alpha = .16f),
+            style = Stroke(2.4.dp.toPx(), cap = StrokeCap.Round)
+        )
+        repeat(5) { index ->
+            val branchX = w * (.06f + index * .045f)
+            val branchY = h * (.085f + index * .012f)
+            drawPath(
+                Path().apply {
+                    moveTo(branchX, branchY)
+                    quadraticBezierTo(branchX + 14.dp.toPx(), branchY - 10.dp.toPx(), branchX + 26.dp.toPx(), branchY - 6.dp.toPx())
+                },
+                ink.copy(alpha = .14f),
+                style = Stroke(1.3.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawOval(
+                ink.copy(alpha = .12f),
+                topLeft = Offset(branchX + 20.dp.toPx(), branchY - 12.dp.toPx()),
+                size = Size(9.dp.toPx(), 5.dp.toPx())
+            )
         }
-        var y = 0f
-        while (y < size.height) {
-            drawLine(palette.secondary.copy(alpha = .04f), Offset(0f, y), Offset(size.width, y), 1f)
-            y += step
-        }
-        drawCircle(palette.tertiary.copy(alpha = .06f), 280.dp.toPx(), Offset(size.width * .92f, size.height * .16f))
-        drawCircle(palette.primary.copy(alpha = .07f), 220.dp.toPx(), Offset(size.width * .06f, size.height * .86f))
+
+        // slow drifting mist band
+        val mistX = (mist % 1f) * w * 1.4f - w * .2f
+        drawRect(
+            Brush.horizontalGradient(
+                listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .1f), Color.White.copy(alpha = 0f)),
+                startX = mistX, endX = mistX + w * .5f
+            ),
+            topLeft = Offset(0f, h * .58f),
+            size = Size(w, h * .1f)
+        )
     }
+}
+
+private fun DrawScope.inkMountain(baseY: Float, peak: Float, color: Color) {
+    val w = size.width
+    val h = size.height
+    val path = Path().apply {
+        moveTo(0f, baseY)
+        cubicTo(w * .15f, baseY - h * peak * 1.4f, w * .3f, baseY - h * peak * .4f, w * .45f, baseY - h * peak)
+        cubicTo(w * .6f, baseY - h * peak * 1.6f, w * .8f, baseY - h * peak * .5f, w, baseY - h * peak * .8f)
+        lineTo(w, baseY + h * .12f)
+        lineTo(0f, baseY + h * .12f)
+        close()
+    }
+    drawPath(
+        path,
+        Brush.verticalGradient(
+            listOf(color.copy(alpha = .16f), color.copy(alpha = 0f)),
+            startY = baseY - h * peak * 1.6f,
+            endY = baseY + h * .06f
+        )
+    )
 }
 
 @Composable
 private fun GomokuHeader(state: GomokuUiState, onUndo: () -> Unit, onRestart: () -> Unit) {
-    val palette = LocalGamePalette.current
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text(
                     "五子棋",
                     style = TextStyle(
-                        brush = Brush.linearGradient(palette.titleColors),
+                        brush = Brush.linearGradient(listOf(Color(0xFF2E2318), Color(0xFF5A4426))),
                         fontSize = 44.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = (-2).sp
                     )
                 )
-                Text(
-                    if (palette.isNature) "清风手谈 · 连五制胜" else "NEON GOBAN",
-                    color = palette.secondary.copy(alpha = .78f), fontSize = 9.sp, letterSpacing = 2.3.sp
-                )
+                Text("手谈一局 · 落子无悔", color = InkMuted, fontSize = 9.sp, letterSpacing = 2.3.sp)
             }
+            Spacer(Modifier.size(8.dp))
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Seal),
+                contentAlignment = Alignment.Center
+            ) { Text("弈", color = Paper, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.weight(1f))
             RoundAction("↶", "撤销", state.canUndo && !state.aiThinking, onUndo)
             Spacer(Modifier.size(9.dp))
@@ -193,7 +268,6 @@ private fun GomokuHeader(state: GomokuUiState, onUndo: () -> Unit, onRestart: ()
 
 @Composable
 private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
-    val palette = LocalGamePalette.current
     val black = when {
         state.isDraw -> null
         state.winner != null -> state.winner == Gomoku.BLACK
@@ -209,9 +283,9 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
         else -> if (black == true) "黑棋落子" else "白棋落子"
     }
     val accent = when (black) {
-        null -> palette.mutedText
-        true -> palette.primary
-        false -> palette.tertiary
+        null -> InkMuted
+        true -> InkText
+        false -> WhiteSide
     }
     val thinking = rememberInfiniteTransition(label = "thinking")
     val pulse by thinking.animateFloat(
@@ -221,18 +295,18 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
     )
     Box(
         modifier
-            .shadow(18.dp, RoundedCornerShape(18.dp), ambientColor = accent.copy(alpha = .28f), spotColor = accent.copy(alpha = .45f))
+            .shadow(14.dp, RoundedCornerShape(18.dp), ambientColor = InkText.copy(alpha = .2f), spotColor = InkText.copy(alpha = .28f))
             .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(listOf(accent.copy(alpha = .18f), palette.cardEnd)))
-            .border(1.dp, accent.copy(alpha = .55f), RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Paper, PaperDeep)))
+            .border(1.dp, accent.copy(alpha = .5f), RoundedCornerShape(18.dp))
             .padding(horizontal = 16.dp, vertical = 13.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             StoneBadge(black)
             Spacer(Modifier.size(10.dp))
             Column {
-                Text("对局状态", fontSize = 9.sp, letterSpacing = 1.7.sp, color = accent.copy(alpha = .86f))
-                Text(label, color = palette.text, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("对局状态", fontSize = 9.sp, letterSpacing = 1.7.sp, color = accent.copy(alpha = .8f))
+                Text(label, color = InkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
         if (state.aiThinking) {
@@ -242,7 +316,7 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
                     .size(7.dp)
                     .alpha(.3f + .7f * pulse)
                     .clip(CircleShape)
-                    .background(palette.tertiary)
+                    .background(Seal)
             )
         }
     }
@@ -251,19 +325,19 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
 @Composable
 private fun StoneBadge(black: Boolean?) {
     val base = when (black) {
-        null -> Color(0xFF8A94A6)
-        true -> Color(0xFF11151D)
-        false -> Color(0xFFF2F4F8)
+        null -> Color(0xFFB7A98A)
+        true -> Color(0xFF1A1E28)
+        false -> Color(0xFFF7F1DE)
     }
     val rim = when (black) {
-        null -> Color(0xFF6C7688)
-        true -> Color(0xFF3A4252)
-        false -> Color(0xFF9AA3B4)
+        null -> Color(0xFF8C7B5E)
+        true -> Color(0xFF5E6878)
+        false -> ClamRim
     }
     Box(
         Modifier
             .size(24.dp)
-            .shadow(8.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .3f), spotColor = Color.Black.copy(alpha = .3f))
+            .shadow(8.dp, CircleShape, ambientColor = InkText.copy(alpha = .28f), spotColor = InkText.copy(alpha = .28f))
             .clip(CircleShape)
             .background(base)
             .border(1.dp, rim, CircleShape)
@@ -272,20 +346,19 @@ private fun StoneBadge(black: Boolean?) {
 
 @Composable
 private fun MoveCard(state: GomokuUiState, modifier: Modifier = Modifier) {
-    val palette = LocalGamePalette.current
     Box(
         modifier
-            .shadow(18.dp, RoundedCornerShape(18.dp), ambientColor = palette.secondary.copy(alpha = .28f), spotColor = palette.secondary.copy(alpha = .45f))
+            .shadow(14.dp, RoundedCornerShape(18.dp), ambientColor = InkText.copy(alpha = .2f), spotColor = InkText.copy(alpha = .28f))
             .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(listOf(palette.secondary.copy(alpha = .18f), palette.cardEnd)))
-            .border(1.dp, palette.secondary.copy(alpha = .55f), RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Paper, PaperDeep)))
+            .border(1.dp, Seal.copy(alpha = .5f), RoundedCornerShape(18.dp))
             .padding(horizontal = 18.dp, vertical = 13.dp)
     ) {
         Column {
-            Text("手数", fontSize = 9.sp, letterSpacing = 1.7.sp, color = palette.secondary.copy(alpha = .86f))
+            Text("手数", fontSize = 9.sp, letterSpacing = 1.7.sp, color = Seal.copy(alpha = .85f))
             Text(
                 state.moveCount.toString().padStart(3, '0'),
-                color = palette.text, fontSize = 23.sp, fontWeight = FontWeight.Bold
+                color = InkText, fontSize = 23.sp, fontWeight = FontWeight.Bold
             )
         }
     }
@@ -293,19 +366,18 @@ private fun MoveCard(state: GomokuUiState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun RoundAction(symbol: String, label: String, enabled: Boolean, action: () -> Unit) {
-    val palette = LocalGamePalette.current
     IconButton(
         onClick = action,
         enabled = enabled,
         modifier = Modifier
             .size(48.dp)
             .semantics { contentDescription = label }
-            .shadow(12.dp, CircleShape, ambientColor = palette.primary.copy(alpha = .25f), spotColor = palette.primary.copy(alpha = .4f))
+            .shadow(10.dp, CircleShape, ambientColor = InkText.copy(alpha = .22f), spotColor = InkText.copy(alpha = .3f))
             .clip(CircleShape)
-            .background(Brush.linearGradient(palette.actionBackground))
-            .border(1.dp, palette.primary.copy(alpha = if (enabled) .55f else .14f), CircleShape)
+            .background(Brush.linearGradient(listOf(Paper, PaperDeep)))
+            .border(1.dp, InkText.copy(alpha = if (enabled) .5f else .16f), CircleShape)
     ) {
-        Text(symbol, fontSize = 25.sp, fontWeight = FontWeight.Medium, color = palette.text.copy(alpha = if (enabled) .9f else .22f))
+        Text(symbol, fontSize = 25.sp, fontWeight = FontWeight.Medium, color = InkText.copy(alpha = if (enabled) .85f else .25f))
     }
 }
 
@@ -352,29 +424,27 @@ private fun SegmentOption(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val palette = LocalGamePalette.current
-    val outline = if (selected) palette.primary else palette.mutedText.copy(alpha = .3f)
+    val outline = if (selected) Seal else InkMuted.copy(alpha = .35f)
     Column(
         modifier
             .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) palette.primary.copy(alpha = .12f) else palette.surface.copy(alpha = .72f))
+            .background(if (selected) Seal.copy(alpha = .1f) else Paper.copy(alpha = .85f))
             .border(if (selected) 1.5.dp else 1.dp, outline, RoundedCornerShape(16.dp))
             .clickable(onClickLabel = label) { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (selected) palette.primary else palette.mutedText.copy(alpha = .35f)))
-            Text(label, color = palette.text, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (selected) Seal else InkMuted.copy(alpha = .4f)))
+            Text(label, color = InkText, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
         }
-        Text(caption, color = palette.mutedText, fontSize = 10.sp)
+        Text(caption, color = InkMuted, fontSize = 10.sp)
     }
 }
 
 @Composable
 private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
-    val palette = LocalGamePalette.current
     val appear = remember { Animatable(1f) }
     LaunchedEffect(state.moveId, state.lastMove) {
         if (state.lastMove != null) {
@@ -395,18 +465,17 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .shadow(30.dp, RoundedCornerShape(26.dp), ambientColor = palette.primary.copy(alpha = .26f), spotColor = palette.secondary.copy(alpha = .38f))
+            .shadow(26.dp, RoundedCornerShape(26.dp), ambientColor = Color(0xFF5E3F1B).copy(alpha = .4f), spotColor = Color(0xFF5E3F1B).copy(alpha = .45f))
             .clip(RoundedCornerShape(26.dp))
-            .background(Brush.linearGradient(listOf(palette.primary.copy(alpha = .72f), palette.secondary.copy(alpha = .7f), palette.tertiary.copy(alpha = .68f))))
-            .padding(1.dp)
+            .background(Brush.verticalGradient(WoodFrame))
+            .border(1.dp, Color(0xFF463013), RoundedCornerShape(26.dp))
+            .padding(9.dp)
     ) {
-        val gridColor = if (palette.isNature) Color(0xFF4E6B47).copy(alpha = .6f) else palette.primary.copy(alpha = .32f)
-        val gridEdge = if (palette.isNature) Color(0xFF3D5738) else palette.secondary.copy(alpha = .55f)
         Canvas(
             Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(25.dp))
-                .background(palette.boardSurface)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(Wood))
                 .padding(11.dp)
                 .pointerInput(interactive) {
                     if (!interactive) return@pointerInput
@@ -423,26 +492,54 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
         ) {
             val side = min(size.width, size.height)
             val cell = side / (Gomoku.SIZE - 1)
-            val line = 1.dp.toPx()
 
+            // wood grain: gentle wavy growth lines
+            repeat(9) { index ->
+                val grainY = side * (.07f + index * .105f)
+                val amp = side * .012f
+                drawPath(
+                    Path().apply {
+                        moveTo(0f, grainY)
+                        cubicTo(side * .3f, grainY - amp, side * .62f, grainY + amp, side, grainY - amp * .6f)
+                    },
+                    Grain.copy(alpha = .1f + (index % 3) * .035f),
+                    style = Stroke(1.1.dp.toPx())
+                )
+            }
+            drawPath(
+                Path().apply {
+                    moveTo(0f, side * .34f)
+                    cubicTo(side * .25f, side * .31f, side * .7f, side * .38f, side, side * .33f)
+                },
+                Grain.copy(alpha = .2f),
+                style = Stroke(1.6.dp.toPx())
+            )
+            drawRect(
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = .12f), Color.White.copy(alpha = 0f), Color.White.copy(alpha = .06f)),
+                    start = Offset.Zero, end = Offset(side, side)
+                )
+            )
+
+            // ink grid
+            val line = 1.dp.toPx()
             for (i in 0 until Gomoku.SIZE) {
                 val position = i * cell
-                drawLine(gridColor, Offset(0f, position), Offset(side, position), line)
-                drawLine(gridColor, Offset(position, 0f), Offset(position, side), line)
+                drawLine(GridInk.copy(alpha = .85f), Offset(0f, position), Offset(side, position), line)
+                drawLine(GridInk.copy(alpha = .85f), Offset(position, 0f), Offset(position, side), line)
             }
-            drawLine(gridEdge, Offset(0f, 0f), Offset(side, 0f), line * 1.6f)
-            drawLine(gridEdge, Offset(0f, side), Offset(side, side), line * 1.6f)
-            drawLine(gridEdge, Offset(0f, 0f), Offset(0f, side), line * 1.6f)
-            drawLine(gridEdge, Offset(side, 0f), Offset(side, side), line * 1.6f)
+            drawLine(GridInk, Offset(0f, 0f), Offset(side, 0f), line * 1.7f)
+            drawLine(GridInk, Offset(0f, side), Offset(side, side), line * 1.7f)
+            drawLine(GridInk, Offset(0f, 0f), Offset(0f, side), line * 1.7f)
+            drawLine(GridInk, Offset(side, 0f), Offset(side, side), line * 1.7f)
             listOf(3 to 3, 3 to 11, 11 to 3, 11 to 11, 7 to 7).forEach { (sx, sy) ->
-                drawCircle(gridEdge, 2.2.dp.toPx(), Offset(sx * cell, sy * cell))
+                drawCircle(GridInk, 2.4.dp.toPx(), Offset(sx * cell, sy * cell))
             }
 
             fun center(index: Int) = Offset((index % Gomoku.SIZE) * cell, (index / Gomoku.SIZE) * cell)
-            val accent = if (palette.isNature) palette.primary else palette.tertiary
             if (state.winningLine.isNotEmpty()) {
                 drawLine(
-                    accent.copy(alpha = .25f + .45f * pulse),
+                    Seal.copy(alpha = .3f + .45f * pulse),
                     center(state.winningLine.first()),
                     center(state.winningLine.last()),
                     strokeWidth = 4.dp.toPx(),
@@ -454,20 +551,20 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
             state.board.forEachIndexed { index, stone ->
                 if (stone == Gomoku.EMPTY) return@forEachIndexed
                 val scale = if (index == state.lastMove) appear.value else 1f
-                drawStone(center(index), radius * scale, stone, palette)
+                drawStone(center(index), radius * scale, stone)
             }
 
             state.lastMove?.let { index ->
                 if (state.board[index] != Gomoku.EMPTY) {
-                    val marker = if (state.board[index] == Gomoku.BLACK) Color.White.copy(alpha = .85f) else Color(0xFF1B2334).copy(alpha = .75f)
-                    drawCircle(marker, radius * .18f * appear.value, center(index))
+                    drawCircle(Seal, radius * .16f * appear.value, center(index))
+                    drawCircle(Paper.copy(alpha = .8f), radius * .16f * appear.value, center(index), style = Stroke(.8.dp.toPx()))
                 }
             }
             if (state.winningLine.isNotEmpty()) {
                 state.winningLine.forEach { index ->
                     drawCircle(
-                        accent.copy(alpha = .4f + .4f * pulse),
-                        radius * 1.16f,
+                        Seal.copy(alpha = .45f + .4f * pulse),
+                        radius * 1.18f,
                         center(index),
                         style = Stroke(2.dp.toPx())
                     )
@@ -477,50 +574,33 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
     }
 }
 
-private fun DrawScope.drawStone(center: Offset, radius: Float, stone: Int, palette: GamePalette) {
+/** Classic yunzi stones: slate black and clamshell white, each with a soft drop shadow. */
+private fun DrawScope.drawStone(center: Offset, radius: Float, stone: Int) {
     if (radius <= 0f) return
+    drawOval(
+        Color.Black.copy(alpha = .2f),
+        topLeft = Offset(center.x - radius * .92f + radius * .14f, center.y - radius * .82f + radius * .22f),
+        size = Size(radius * 1.84f, radius * 1.64f)
+    )
     if (stone == Gomoku.BLACK) {
         drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    if (palette.isNature) Color(0xFF46524A) else Color(0xFF4D5872),
-                    if (palette.isNature) Color(0xFF151B17) else Color(0xFF0B0E16),
-                    if (palette.isNature) Color(0xFF0C110D) else Color(0xFF05070C)
-                ),
-                center = Offset(center.x - radius * .4f, center.y - radius * .4f),
-                radius = radius * 1.8f
-            ),
-            radius = radius,
-            center = center
+            Brush.radialGradient(Slate, center = center + Offset(-radius * .35f, -radius * .35f), radius = radius * 1.9f),
+            radius, center
         )
-        if (!palette.isNature) {
-            drawCircle(palette.primary.copy(alpha = .22f), radius, center, style = Stroke(1.dp.toPx()))
-        }
-        drawCircle(Color.White.copy(alpha = .3f), radius * .16f, Offset(center.x - radius * .38f, center.y - radius * .38f))
+        drawCircle(Color(0xFF8B96A8).copy(alpha = .3f), radius, center, style = Stroke(1.dp.toPx()))
+        drawCircle(Color.White.copy(alpha = .32f), radius * .16f, center + Offset(-radius * .38f, -radius * .38f))
     } else {
         drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White,
-                    if (palette.isNature) Color(0xFFEFF3E6) else Color(0xFFDDE2EC),
-                    if (palette.isNature) Color(0xFFC9D2BC) else Color(0xFF9FA9BE)
-                ),
-                center = Offset(center.x - radius * .4f, center.y - radius * .4f),
-                radius = radius * 1.9f
-            ),
-            radius = radius,
-            center = center
+            Brush.radialGradient(Clam, center = center + Offset(-radius * .35f, -radius * .35f), radius = radius * 1.9f),
+            radius, center
         )
-        drawCircle(Color(0xFF39404E).copy(alpha = .35f), radius, center, style = Stroke(.8.dp.toPx()))
-        if (!palette.isNature) {
-            drawCircle(palette.secondary.copy(alpha = .18f), radius, center, style = Stroke(1.dp.toPx()))
-        }
+        drawCircle(ClamRim.copy(alpha = .5f), radius, center, style = Stroke(1.dp.toPx()))
+        drawCircle(Color.White.copy(alpha = .5f), radius * .14f, center + Offset(-radius * .36f, -radius * .36f))
     }
 }
 
 @Composable
 private fun GomokuHint(state: GomokuUiState) {
-    val palette = LocalGamePalette.current
     val message = when {
         state.winner != null || state.isDraw -> "一局终了 · 点「↻」再来一局"
         state.aiThinking -> "启发式 AI 正在计算最优落子…"
@@ -530,68 +610,67 @@ private fun GomokuHint(state: GomokuUiState) {
     Row(
         Modifier
             .clip(CircleShape)
-            .background(palette.primary.copy(alpha = .07f))
-            .border(1.dp, palette.primary.copy(alpha = .16f), CircleShape)
+            .background(InkText.copy(alpha = .06f))
+            .border(1.dp, InkText.copy(alpha = .18f), CircleShape)
             .padding(horizontal = 15.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primary))
-        Text("  $message", fontSize = 12.sp, color = palette.mutedText)
+        Box(Modifier.size(6.dp).clip(CircleShape).background(Seal))
+        Text("  $message", fontSize = 12.sp, color = InkMuted)
     }
 }
 
 @Composable
 private fun GomokuResultDialog(state: GomokuUiState, onRestart: () -> Unit, onReview: () -> Unit) {
-    val palette = LocalGamePalette.current
     val blackWins = state.winner == Gomoku.BLACK
     val title: String
     val message: String
     when {
         state.isDraw -> {
-            title = if (palette.isNature) "棋逢对手" else "STALEMATE"
-            message = "225 个交点全部落满，未分胜负——这一局势均力敌。"
+            title = "棋逢对手"
+            message = "225 个交点全部落满，未分胜负——这一局值得回味。"
         }
         state.mode == GomokuMode.PVE && blackWins -> {
-            title = if (palette.isNature) "漂亮，你赢了" else "HUMAN WINS"
+            title = "漂亮，你赢了"
             message = "你执黑连成五子，战胜了${state.difficulty.title}难度的 AI。要不要升一档再战？"
         }
         state.mode == GomokuMode.PVE -> {
-            title = if (palette.isNature) "AI 棋高一着" else "AI WINS"
+            title = "AI 棋高一着"
             message = "${state.difficulty.title}难度的 AI 先你一步连成五子。复盘看看破绽在哪里，再战一局吧。"
         }
         blackWins -> {
-            title = if (palette.isNature) "黑棋连珠" else "BLACK WINS"
+            title = "黑棋连珠"
             message = "执黑方五子连珠获胜，全局共 ${state.moveCount} 手。交换执子再来一局？"
         }
         else -> {
-            title = if (palette.isNature) "白棋连珠" else "WHITE WINS"
+            title = "白棋连珠"
             message = "执白方五子连珠获胜，全局共 ${state.moveCount} 手。交换执子再来一局？"
         }
     }
     AlertDialog(
         onDismissRequest = {},
-        containerColor = palette.surface,
-        tonalElevation = 16.dp,
+        containerColor = Paper,
+        tonalElevation = 12.dp,
         title = {
             Text(
                 title,
                 color = when {
-                    state.isDraw -> palette.mutedText
-                    blackWins -> palette.primary
-                    else -> palette.tertiary
+                    state.isDraw -> InkMuted
+                    state.mode == GomokuMode.PVE && blackWins -> Seal
+                    else -> InkText
                 },
                 fontWeight = FontWeight.Black
             )
         },
-        text = { Text(message, color = palette.mutedText) },
+        text = { Text(message, color = InkMuted) },
         confirmButton = {
             Button(
                 onClick = onRestart,
-                colors = ButtonDefaults.buttonColors(containerColor = palette.secondary, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = Seal, contentColor = Paper)
             ) { Text("再来一局") }
         },
         dismissButton = {
-            TextButton(onClick = onReview) { Text("复盘棋局", color = palette.primary) }
+            TextButton(onClick = onReview) { Text("复盘棋局", color = InkText) }
         }
     )
 }

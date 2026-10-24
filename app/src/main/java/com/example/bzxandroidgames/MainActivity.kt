@@ -114,19 +114,28 @@ class MainActivity : ComponentActivity() {
             val theme by game.theme.collectAsStateWithLifecycle()
             val state by game.state.collectAsStateWithLifecycle()
             val gomokuState by gomoku.state.collectAsStateWithLifecycle()
-            SideEffect {
-                val dark = theme == GameTheme.NEON
-                enableEdgeToEdge(
-                    statusBarStyle = SystemBarStyle.auto(
-                        android.graphics.Color.TRANSPARENT,
-                        android.graphics.Color.TRANSPARENT
-                    ) { dark },
-                    navigationBarStyle = SystemBarStyle.auto(0xE6FFFFFF.toInt(), 0x801B1B1B.toInt()) { dark }
-                )
-            }
             BzxAndroidGamesTheme(theme) {
                 var splashVisible by rememberSaveable { mutableStateOf(true) }
                 var currentGame by rememberSaveable { mutableStateOf<String?>(null) }
+                var librarySkyVisible by remember { mutableStateOf(true) }
+                // The summer lobby has a blue sky; gomoku keeps its light rice paper.
+                val darkBars = when {
+                    splashVisible -> theme == GameTheme.NEON
+                    currentGame == "2048" -> theme == GameTheme.NEON
+                    currentGame == null -> librarySkyVisible
+                    else -> false
+                }
+                SideEffect {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.auto(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        ) { darkBars },
+                        navigationBarStyle = SystemBarStyle.auto(0xE6FFFFFF.toInt(), 0x801B1B1B.toInt()) {
+                            darkBars && (splashVisible || currentGame == "2048")
+                        }
+                    )
+                }
                 BackHandler(enabled = currentGame != null && !splashVisible) { currentGame = null }
                 AnimatedContent(
                     targetState = when {
@@ -153,15 +162,13 @@ class MainActivity : ComponentActivity() {
                             onPlay = gomoku::play,
                             onUndo = gomoku::undo,
                             onRestart = gomoku::restart,
-                            onThemeChange = game::setTheme,
                             onBack = { currentGame = null }
                         )
                     } else {
                         com.example.bzxandroidgames.ui.GameLibrary(
-                            theme,
-                            game::setTheme,
                             on2048 = { currentGame = "2048" },
-                            onGomoku = { currentGame = "gomoku" }
+                            onGomoku = { currentGame = "gomoku" },
+                            onSkyVisibleChange = { librarySkyVisible = it }
                         )
                     }
                 }
