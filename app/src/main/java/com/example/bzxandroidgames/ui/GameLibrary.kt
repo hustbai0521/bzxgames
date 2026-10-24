@@ -38,16 +38,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bzxandroidgames.ui.theme.ShinkaiCountrysideBackdrop
 
-private val DeepInk = Color(0xFF244B54)
-private val SoftInk = Color(0xFF5D777B)
-private val SeaGlass = Color(0xFF368A91)
-private val WarmRose = Color(0xFFB27C78)
-
 /** A fixed summer lobby, independent of the themes used inside the individual games. */
 @Composable
 fun GameLibrary(
     on2048: () -> Unit,
     onGomoku: () -> Unit,
+    onSettings: () -> Unit = {},
     onSkyVisibleChange: (Boolean) -> Unit = {}
 ) {
     var upcoming by rememberSaveable { mutableStateOf<String?>(null) }
@@ -83,6 +79,8 @@ fun GameLibrary(
                         Spacer(Modifier.width(6.dp))
                         Text("晴日心情", color = Color.White, fontSize = 10.sp)
                     }
+                    Spacer(Modifier.width(8.dp))
+                    GearIconButton("设置", onSettings)
                 }
                 Column(Modifier.padding(top = 34.dp).graphicsLayer {
                     alpha = reveal.value

@@ -118,11 +118,13 @@ class MainActivity : ComponentActivity() {
                 var splashVisible by rememberSaveable { mutableStateOf(true) }
                 var currentGame by rememberSaveable { mutableStateOf<String?>(null) }
                 var librarySkyVisible by remember { mutableStateOf(true) }
+                var settingsSkyVisible by remember { mutableStateOf(true) }
                 // The summer lobby has a blue sky; gomoku keeps its light rice paper.
                 val darkBars = when {
                     splashVisible -> theme == GameTheme.NEON
                     currentGame == "2048" -> theme == GameTheme.NEON
                     currentGame == null -> librarySkyVisible
+                    currentGame == "settings" -> settingsSkyVisible
                     else -> false
                 }
                 SideEffect {
@@ -142,6 +144,7 @@ class MainActivity : ComponentActivity() {
                         splashVisible -> "intro"
                         currentGame == "2048" -> "2048"
                         currentGame == "gomoku" -> "gomoku"
+                        currentGame == "settings" -> "settings"
                         else -> "library"
                     },
                     transitionSpec = {
@@ -164,10 +167,16 @@ class MainActivity : ComponentActivity() {
                             onRestart = gomoku::restart,
                             onBack = { currentGame = null }
                         )
+                    } else if (screen == "settings") {
+                        com.example.bzxandroidgames.ui.SettingsScreen(
+                            onBack = { currentGame = null },
+                            onSkyVisibleChange = { settingsSkyVisible = it }
+                        )
                     } else {
                         com.example.bzxandroidgames.ui.GameLibrary(
                             on2048 = { currentGame = "2048" },
                             onGomoku = { currentGame = "gomoku" },
+                            onSettings = { currentGame = "settings" },
                             onSkyVisibleChange = { librarySkyVisible = it }
                         )
                     }
