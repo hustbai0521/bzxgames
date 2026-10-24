@@ -43,6 +43,7 @@ import com.example.bzxandroidgames.ui.theme.ShinkaiCountrysideBackdrop
 fun GameLibrary(
     on2048: () -> Unit,
     onGomoku: () -> Unit,
+    onMinesweeper: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSkyVisibleChange: (Boolean) -> Unit = {}
 ) {
@@ -120,20 +121,22 @@ fun GameLibrary(
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("下一站，小惊喜", color = DeepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("5 款筹备中", color = SoftInk, fontSize = 10.sp)
+                    Text("4 款筹备中", color = SoftInk, fontSize = 10.sp)
                 }
                 val games = listOf(
                     UpcomingGame("贪吃蛇", "一路生长", 0),
                     UpcomingGame("俄罗斯方块", "拼出新可能", 1),
                     UpcomingGame("连连看", "遇见成双的美好", 2),
                     UpcomingGame("蜘蛛纸牌", "静享一局好牌", 3),
-                    UpcomingGame("扫雷", "每一步都是灵感", 4)
+                    UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true)
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     games.chunked(2).forEach { pair ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             pair.forEach { game ->
-                                UpcomingCard(game, Modifier.weight(1f)) { upcoming = game.name }
+                                UpcomingCard(game, Modifier.weight(1f)) {
+                                    if (game.ready) onMinesweeper() else upcoming = game.name
+                                }
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
@@ -227,14 +230,24 @@ private fun GomokuIllustration(modifier: Modifier) {
     }
 }
 
-private data class UpcomingGame(val name: String, val subtitle: String, val icon: Int)
+private data class UpcomingGame(val name: String, val subtitle: String, val icon: Int, val ready: Boolean = false)
 
 @Composable
 private fun UpcomingCard(game: UpcomingGame, modifier: Modifier, onClick: () -> Unit) {
     Row(
-        modifier.clip(RoundedCornerShape(17.dp)).background(Color.White.copy(alpha = .66f))
-            .border(1.dp, Color.White.copy(alpha = .85f), RoundedCornerShape(17.dp))
-            .clickable(role = Role.Button, onClickLabel = "${game.name}，敬请期待", onClick = onClick)
+        modifier
+            .clip(RoundedCornerShape(17.dp))
+            .background(if (game.ready) Color.White.copy(alpha = .92f) else Color.White.copy(alpha = .66f))
+            .border(
+                1.dp,
+                if (game.ready) SeaGlass.copy(alpha = .45f) else Color.White.copy(alpha = .85f),
+                RoundedCornerShape(17.dp)
+            )
+            .clickable(
+                role = Role.Button,
+                onClickLabel = if (game.ready) "进入${game.name}" else "${game.name}，敬请期待",
+                onClick = onClick
+            )
             .heightIn(min = 85.dp).padding(horizontal = 12.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -243,7 +256,11 @@ private fun UpcomingCard(game: UpcomingGame, modifier: Modifier, onClick: () -> 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(game.name, color = DeepInk, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             Text(game.subtitle, color = SoftInk, fontSize = 9.sp)
-            Text("筹备中", color = SeaGlass.copy(alpha = .8f), fontSize = 8.sp)
+            if (game.ready) {
+                Text("开始游戏 →", color = SeaGlass, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                Text("筹备中", color = SeaGlass.copy(alpha = .8f), fontSize = 8.sp)
+            }
         }
     }
 }

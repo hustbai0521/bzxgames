@@ -10,6 +10,18 @@ enum class GomokuDifficulty(val title: String) {
     HARD("困难")
 }
 
+/** Visual board skins: CLASSIC is the wooden goban, EXERCISE a grid exercise book where
+ *  the black side draws circles and the white side draws check marks. */
+enum class GomokuBoardSkin(val title: String, val caption: String) {
+    CLASSIC("经典木盘", "手谈方圆 · 水墨木韵"),
+    EXERCISE("作业本", "方格之间 · 圈勾手谈");
+
+    companion object {
+        fun fromStorage(value: String?): GomokuBoardSkin =
+            entries.firstOrNull { it.name == value } ?: CLASSIC
+    }
+}
+
 /**
  * Freestyle gomoku on a 15x15 board: cells hold [EMPTY], [BLACK] or [WHITE], and the first
  * side to line up five or more stones in any direction wins.

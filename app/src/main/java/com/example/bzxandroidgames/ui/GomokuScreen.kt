@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bzxandroidgames.game.Gomoku
+import com.example.bzxandroidgames.game.GomokuBoardSkin
 import com.example.bzxandroidgames.game.GomokuDifficulty
 import com.example.bzxandroidgames.game.GomokuMode
 import com.example.bzxandroidgames.game.GomokuUiState
@@ -91,16 +93,28 @@ private val Clam = listOf(Color(0xFFFFFFFF), Color(0xFFF5EEDC), Color(0xFFD8CCA5
 private val ClamRim = Color(0xFFB6A87F)
 private val WhiteSide = Color(0xFFA08D62)
 
+// Exercise-book skin: a grid notebook sheet with blue-ink circles for black and
+// red-ink check marks for white, like a teacher's marking pen.
+private val SheetWhite = listOf(Color(0xFFFDFDF8), Color(0xFFF5F3E9))
+private val SheetFrame = listOf(Color(0xFFDCE7F2), Color(0xFFC7D8E8))
+private val SheetFrameBorder = Color(0xFF9FB8CC)
+private val SheetLine = Color(0xFF9DBBD6).copy(alpha = .55f)
+private val SheetEdge = Color(0xFF7FA3C0)
+private val PenBlue = Color(0xFF3A5A8C)
+private val PenRed = Color(0xFFD9483B)
+
 @Composable
 fun GomokuScreen(
     state: GomokuUiState,
     onSelectMode: (GomokuMode) -> Unit,
     onSelectDifficulty: (GomokuDifficulty) -> Unit,
+    onSelectBoardSkin: (GomokuBoardSkin) -> Unit,
     onPlay: (Int) -> Unit,
     onUndo: () -> Unit,
     onRestart: () -> Unit,
     onBack: () -> Unit
 ) {
+    var shopOpen by remember { mutableStateOf(false) }
     Box(
         Modifier
             .fillMaxSize()
@@ -124,8 +138,10 @@ fun GomokuScreen(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            Text("手谈方圆 · 水墨木韵", color = InkMuted, fontSize = 10.sp, letterSpacing = 2.sp)
-            Spacer(Modifier.height(17.dp))
+            Text(state.boardSkin.caption, color = InkMuted, fontSize = 10.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(12.dp))
+            BoardShopEntry(state.boardSkin) { shopOpen = true }
+            Spacer(Modifier.height(16.dp))
             GomokuBoard(state, onPlay)
             Spacer(Modifier.height(18.dp))
             GomokuHint(state)
@@ -142,6 +158,9 @@ fun GomokuScreen(
     if (state.winner != null || state.isDraw) {
         var reviewed by remember(state.moveId) { mutableStateOf(false) }
         if (!reviewed) GomokuResultDialog(state, onRestart) { reviewed = true }
+    }
+    if (shopOpen) {
+        BoardShopDialog(state.boardSkin, onSelectBoardSkin) { shopOpen = false }
     }
 }
 
@@ -302,7 +321,7 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
             .padding(horizontal = 16.dp, vertical = 13.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StoneBadge(black)
+            StoneBadge(black, state.boardSkin)
             Spacer(Modifier.size(10.dp))
             Column {
                 Text("对局状态", fontSize = 9.sp, letterSpacing = 1.7.sp, color = accent.copy(alpha = .8f))
@@ -322,8 +341,30 @@ private fun TurnCard(state: GomokuUiState, modifier: Modifier = Modifier) {
     }
 }
 
+/** Side badge: yunzi stone on the classic board, pen mark on the exercise book. */
 @Composable
-private fun StoneBadge(black: Boolean?) {
+private fun StoneBadge(black: Boolean?, skin: GomokuBoardSkin) {
+    if (skin == GomokuBoardSkin.EXERCISE) {
+        Canvas(Modifier.size(24.dp)) {
+            val r = size.minDimension * .4f
+            when (black) {
+                null -> drawLine(
+                    Color(0xFF8C7B5E), Offset(size.width * .18f, center.y), Offset(size.width * .82f, center.y), 2.dp.toPx(), StrokeCap.Round
+                )
+                true -> drawCircle(PenBlue, r, center, style = Stroke(2.4.dp.toPx()))
+                else -> drawPath(
+                    Path().apply {
+                        moveTo(center.x - r * .85f, center.y)
+                        lineTo(center.x - r * .15f, center.y + r * .75f)
+                        lineTo(center.x + r, center.y - r * .8f)
+                    },
+                    PenRed,
+                    style = Stroke(2.4.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+        }
+        return
+    }
     val base = when (black) {
         null -> Color(0xFFB7A98A)
         true -> Color(0xFF1A1E28)
@@ -460,22 +501,24 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
     )
     val interactive = state.winner == null && !state.isDraw && !state.aiThinking &&
         (state.mode == GomokuMode.PVP || state.currentPlayer == Gomoku.BLACK)
+    val exercise = state.boardSkin == GomokuBoardSkin.EXERCISE
+    val frameShadow = if (exercise) Color(0xFF6D87A0) else Color(0xFF5E3F1B)
 
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .shadow(26.dp, RoundedCornerShape(26.dp), ambientColor = Color(0xFF5E3F1B).copy(alpha = .4f), spotColor = Color(0xFF5E3F1B).copy(alpha = .45f))
+            .shadow(26.dp, RoundedCornerShape(26.dp), ambientColor = frameShadow.copy(alpha = .4f), spotColor = frameShadow.copy(alpha = .45f))
             .clip(RoundedCornerShape(26.dp))
-            .background(Brush.verticalGradient(WoodFrame))
-            .border(1.dp, Color(0xFF463013), RoundedCornerShape(26.dp))
+            .background(Brush.verticalGradient(if (exercise) SheetFrame else WoodFrame))
+            .border(1.dp, if (exercise) SheetFrameBorder else Color(0xFF463013), RoundedCornerShape(26.dp))
             .padding(9.dp)
     ) {
         Canvas(
             Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(18.dp))
-                .background(Brush.linearGradient(Wood))
+                .background(Brush.linearGradient(if (exercise) SheetWhite else Wood))
                 .padding(11.dp)
                 .pointerInput(interactive) {
                     if (!interactive) return@pointerInput
@@ -493,53 +536,59 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
             val side = min(size.width, size.height)
             val cell = side / (Gomoku.SIZE - 1)
 
-            // wood grain: gentle wavy growth lines
-            repeat(9) { index ->
-                val grainY = side * (.07f + index * .105f)
-                val amp = side * .012f
+            // wood grain: gentle wavy growth lines (classic skin only)
+            if (!exercise) {
+                repeat(9) { index ->
+                    val grainY = side * (.07f + index * .105f)
+                    val amp = side * .012f
+                    drawPath(
+                        Path().apply {
+                            moveTo(0f, grainY)
+                            cubicTo(side * .3f, grainY - amp, side * .62f, grainY + amp, side, grainY - amp * .6f)
+                        },
+                        Grain.copy(alpha = .1f + (index % 3) * .035f),
+                        style = Stroke(1.1.dp.toPx())
+                    )
+                }
                 drawPath(
                     Path().apply {
-                        moveTo(0f, grainY)
-                        cubicTo(side * .3f, grainY - amp, side * .62f, grainY + amp, side, grainY - amp * .6f)
+                        moveTo(0f, side * .34f)
+                        cubicTo(side * .25f, side * .31f, side * .7f, side * .38f, side, side * .33f)
                     },
-                    Grain.copy(alpha = .1f + (index % 3) * .035f),
-                    style = Stroke(1.1.dp.toPx())
+                    Grain.copy(alpha = .2f),
+                    style = Stroke(1.6.dp.toPx())
+                )
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = .12f), Color.White.copy(alpha = 0f), Color.White.copy(alpha = .06f)),
+                        start = Offset.Zero, end = Offset(side, side)
+                    )
                 )
             }
-            drawPath(
-                Path().apply {
-                    moveTo(0f, side * .34f)
-                    cubicTo(side * .25f, side * .31f, side * .7f, side * .38f, side, side * .33f)
-                },
-                Grain.copy(alpha = .2f),
-                style = Stroke(1.6.dp.toPx())
-            )
-            drawRect(
-                Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = .12f), Color.White.copy(alpha = 0f), Color.White.copy(alpha = .06f)),
-                    start = Offset.Zero, end = Offset(side, side)
-                )
-            )
 
-            // ink grid
+            // grid: ink on wood, or faint blue squares on the exercise sheet
+            val lineColor = if (exercise) SheetLine else GridInk.copy(alpha = .85f)
+            val edgeColor = if (exercise) SheetEdge else GridInk
             val line = 1.dp.toPx()
             for (i in 0 until Gomoku.SIZE) {
                 val position = i * cell
-                drawLine(GridInk.copy(alpha = .85f), Offset(0f, position), Offset(side, position), line)
-                drawLine(GridInk.copy(alpha = .85f), Offset(position, 0f), Offset(position, side), line)
+                drawLine(lineColor, Offset(0f, position), Offset(side, position), line)
+                drawLine(lineColor, Offset(position, 0f), Offset(position, side), line)
             }
-            drawLine(GridInk, Offset(0f, 0f), Offset(side, 0f), line * 1.7f)
-            drawLine(GridInk, Offset(0f, side), Offset(side, side), line * 1.7f)
-            drawLine(GridInk, Offset(0f, 0f), Offset(0f, side), line * 1.7f)
-            drawLine(GridInk, Offset(side, 0f), Offset(side, side), line * 1.7f)
+            drawLine(edgeColor, Offset(0f, 0f), Offset(side, 0f), line * 1.7f)
+            drawLine(edgeColor, Offset(0f, side), Offset(side, side), line * 1.7f)
+            drawLine(edgeColor, Offset(0f, 0f), Offset(0f, side), line * 1.7f)
+            drawLine(edgeColor, Offset(side, 0f), Offset(side, side), line * 1.7f)
+            val starColor = if (exercise) Color(0xFF9DBBD6) else GridInk
             listOf(3 to 3, 3 to 11, 11 to 3, 11 to 11, 7 to 7).forEach { (sx, sy) ->
-                drawCircle(GridInk, 2.4.dp.toPx(), Offset(sx * cell, sy * cell))
+                drawCircle(starColor, 2.4.dp.toPx(), Offset(sx * cell, sy * cell))
             }
 
             fun center(index: Int) = Offset((index % Gomoku.SIZE) * cell, (index / Gomoku.SIZE) * cell)
+            val winAccent = if (exercise) PenBlue else Seal
             if (state.winningLine.isNotEmpty()) {
                 drawLine(
-                    Seal.copy(alpha = .3f + .45f * pulse),
+                    winAccent.copy(alpha = .3f + .45f * pulse),
                     center(state.winningLine.first()),
                     center(state.winningLine.last()),
                     strokeWidth = 4.dp.toPx(),
@@ -551,19 +600,24 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
             state.board.forEachIndexed { index, stone ->
                 if (stone == Gomoku.EMPTY) return@forEachIndexed
                 val scale = if (index == state.lastMove) appear.value else 1f
-                drawStone(center(index), radius * scale, stone)
+                drawStone(center(index), radius * scale, stone, state.boardSkin)
             }
 
             state.lastMove?.let { index ->
                 if (state.board[index] != Gomoku.EMPTY) {
-                    drawCircle(Seal, radius * .16f * appear.value, center(index))
-                    drawCircle(Paper.copy(alpha = .8f), radius * .16f * appear.value, center(index), style = Stroke(.8.dp.toPx()))
+                    if (exercise) {
+                        val marker = if (state.board[index] == Gomoku.BLACK) PenRed else PenBlue
+                        drawCircle(marker, radius * .14f * appear.value, center(index))
+                    } else {
+                        drawCircle(Seal, radius * .16f * appear.value, center(index))
+                        drawCircle(Paper.copy(alpha = .8f), radius * .16f * appear.value, center(index), style = Stroke(.8.dp.toPx()))
+                    }
                 }
             }
             if (state.winningLine.isNotEmpty()) {
                 state.winningLine.forEach { index ->
                     drawCircle(
-                        Seal.copy(alpha = .45f + .4f * pulse),
+                        winAccent.copy(alpha = .45f + .4f * pulse),
                         radius * 1.18f,
                         center(index),
                         style = Stroke(2.dp.toPx())
@@ -574,9 +628,26 @@ private fun GomokuBoard(state: GomokuUiState, onPlay: (Int) -> Unit) {
     }
 }
 
-/** Classic yunzi stones: slate black and clamshell white, each with a soft drop shadow. */
-private fun DrawScope.drawStone(center: Offset, radius: Float, stone: Int) {
+/** Classic skin keeps the yunzi stones; the exercise book draws pen marks instead:
+ *  a blue-ink circle for black and a red-ink check mark for white. */
+private fun DrawScope.drawStone(center: Offset, radius: Float, stone: Int, skin: GomokuBoardSkin) {
     if (radius <= 0f) return
+    if (skin == GomokuBoardSkin.EXERCISE) {
+        if (stone == Gomoku.BLACK) {
+            drawCircle(PenBlue, radius * .72f, center, style = Stroke(radius * .22f))
+        } else {
+            drawPath(
+                Path().apply {
+                    moveTo(center.x - radius * .5f, center.y + radius * .02f)
+                    lineTo(center.x - radius * .08f, center.y + radius * .46f)
+                    lineTo(center.x + radius * .62f, center.y - radius * .48f)
+                },
+                PenRed,
+                style = Stroke(radius * .26f, cap = StrokeCap.Round)
+            )
+        }
+        return
+    }
     drawOval(
         Color.Black.copy(alpha = .2f),
         topLeft = Offset(center.x - radius * .92f + radius * .14f, center.y - radius * .82f + radius * .22f),
@@ -596,6 +667,143 @@ private fun DrawScope.drawStone(center: Offset, radius: Float, stone: Int) {
         )
         drawCircle(ClamRim.copy(alpha = .5f), radius, center, style = Stroke(1.dp.toPx()))
         drawCircle(Color.White.copy(alpha = .5f), radius * .14f, center + Offset(-radius * .36f, -radius * .36f))
+    }
+}
+
+/** Entry pill under the caption that opens the board shop. */
+@Composable
+private fun BoardShopEntry(skin: GomokuBoardSkin, onOpen: () -> Unit) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(Paper.copy(alpha = .9f))
+            .border(1.dp, InkText.copy(alpha = .28f), CircleShape)
+            .clickable(onClickLabel = "棋盘商店") { onOpen() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        ShopBagGlyph(Modifier.size(15.dp), Seal)
+        Text("棋盘商店 · ${skin.title}", fontSize = 12.sp, color = InkText, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun ShopBagGlyph(modifier: Modifier, tint: Color) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        // shopping bag: body plus handle arc
+        drawRoundRect(
+            tint,
+            topLeft = Offset(w * .16f, h * .42f),
+            size = Size(w * .68f, h * .5f),
+            cornerRadius = CornerRadius(w * .1f, w * .1f)
+        )
+        drawArc(
+            tint,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(w * .32f, h * .12f),
+            size = Size(w * .36f, h * .6f),
+            style = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
+}
+
+@Composable
+private fun BoardShopDialog(
+    current: GomokuBoardSkin,
+    onSelect: (GomokuBoardSkin) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Paper,
+        tonalElevation = 12.dp,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShopBagGlyph(Modifier.size(17.dp), Seal)
+                Column {
+                    Text("棋盘商店", color = InkText, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Text("挑选一款棋盘皮肤，随时可换", color = InkMuted, fontSize = 11.sp)
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                GomokuBoardSkin.entries.forEach { skin ->
+                    SkinOption(skin, selected = skin == current) { onSelect(skin) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("完成", color = Seal, fontWeight = FontWeight.Bold) }
+        }
+    )
+}
+
+@Composable
+private fun SkinOption(skin: GomokuBoardSkin, selected: Boolean, onClick: () -> Unit) {
+    val outline = if (selected) Seal else InkMuted.copy(alpha = .35f)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) Seal.copy(alpha = .08f) else PaperDeep.copy(alpha = .6f))
+            .border(if (selected) 1.5.dp else 1.dp, outline, RoundedCornerShape(16.dp))
+            .clickable(onClickLabel = skin.title) { onClick() }
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SkinPreview(skin, Modifier.size(64.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(skin.title, color = InkText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (skin == GomokuBoardSkin.CLASSIC) "榧木棋盘 · 墨线云子" else "方格纸面 · 蓝圈红勾",
+                color = InkMuted, fontSize = 11.sp
+            )
+        }
+        if (selected) {
+            Text(
+                "使用中",
+                color = Paper, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Seal)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
+/** Small live preview of each board skin drawn with the same style as the real board. */
+@Composable
+private fun SkinPreview(skin: GomokuBoardSkin, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val corner = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+        if (skin == GomokuBoardSkin.EXERCISE) {
+            drawRoundRect(Color(0xFFC7D8E8), cornerRadius = corner)
+            drawRoundRect(Color(0xFFFDFDF8), topLeft = Offset(3.dp.toPx(), 3.dp.toPx()), size = Size(size.width - 6.dp.toPx(), size.height - 6.dp.toPx()), cornerRadius = corner)
+        } else {
+            drawRoundRect(Color(0xFF7C5527), cornerRadius = corner)
+            drawRoundRect(Color(0xFFDCB26A), topLeft = Offset(3.dp.toPx(), 3.dp.toPx()), size = Size(size.width - 6.dp.toPx(), size.height - 6.dp.toPx()), cornerRadius = corner)
+        }
+        val inset = size.width * .24f
+        val span = size.width - inset * 2
+        val gridLine = if (skin == GomokuBoardSkin.EXERCISE) SheetLine else GridInk.copy(alpha = .85f)
+        repeat(3) { i ->
+            val position = inset + span * i / 2f
+            drawLine(gridLine, Offset(inset, position), Offset(size.width - inset, position), 1.dp.toPx())
+            drawLine(gridLine, Offset(position, inset), Offset(position, size.height - inset), 1.dp.toPx())
+        }
+        val step = span / 2f
+        val radius = step * .3f
+        // first-player mark at top-left intersection, second-player mark at bottom-right
+        drawStone(Offset(inset, inset), radius, Gomoku.BLACK, skin)
+        drawStone(Offset(inset + step, inset + step), radius, Gomoku.WHITE, skin)
     }
 }
 

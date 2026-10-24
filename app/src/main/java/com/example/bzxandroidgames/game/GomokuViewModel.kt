@@ -18,6 +18,7 @@ data class GomokuUiState(
     val board: List<Int> = Gomoku.emptyBoard(),
     val mode: GomokuMode = GomokuMode.PVE,
     val difficulty: GomokuDifficulty = GomokuDifficulty.MEDIUM,
+    val boardSkin: GomokuBoardSkin = GomokuBoardSkin.CLASSIC,
     val currentPlayer: Int = Gomoku.BLACK,
     val winner: Int? = null,
     val isDraw: Boolean = false,
@@ -37,7 +38,8 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
             mode = GomokuMode.entries.firstOrNull { it.name == preferences.getString("gomokuMode", null) }
                 ?: GomokuMode.PVE,
             difficulty = GomokuDifficulty.entries.firstOrNull { it.name == preferences.getString("gomokuDifficulty", null) }
-                ?: GomokuDifficulty.MEDIUM
+                ?: GomokuDifficulty.MEDIUM,
+            boardSkin = GomokuBoardSkin.fromStorage(preferences.getString("gomokuBoardSkin", null))
         )
     )
     val state: StateFlow<GomokuUiState> = _state.asStateFlow()
@@ -53,6 +55,12 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
     fun selectDifficulty(difficulty: GomokuDifficulty) {
         preferences.edit { putString("gomokuDifficulty", difficulty.name) }
         if (_state.value.difficulty != difficulty) resetWith(_state.value.mode, difficulty)
+    }
+
+    /** Skins are cosmetic: switching one keeps the current game untouched. */
+    fun selectBoardSkin(skin: GomokuBoardSkin) {
+        preferences.edit { putString("gomokuBoardSkin", skin.name) }
+        _state.update { if (it.boardSkin != skin) it.copy(boardSkin = skin) else it }
     }
 
     fun restart() = resetWith(_state.value.mode, _state.value.difficulty)
@@ -147,7 +155,12 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
     private fun resetWith(mode: GomokuMode, difficulty: GomokuDifficulty) {
         history.clear()
         _state.update {
-            GomokuUiState(mode = mode, difficulty = difficulty, moveId = it.moveId + 1)
+            GomokuUiState(
+                mode = mode,
+                difficulty = difficulty,
+                boardSkin = it.boardSkin,
+                moveId = it.moveId + 1
+            )
         }
     }
 }

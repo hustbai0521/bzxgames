@@ -98,8 +98,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.example.bzxandroidgames.game.Game2048
 import com.example.bzxandroidgames.game.GomokuViewModel
+import com.example.bzxandroidgames.game.MinesweeperViewModel
 import com.example.bzxandroidgames.game.MoveResult
 import com.example.bzxandroidgames.ui.GomokuScreen
+import com.example.bzxandroidgames.ui.MinesweeperScreen
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -111,9 +113,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val game: GameViewModel = viewModel()
             val gomoku: GomokuViewModel = viewModel()
+            val mines: MinesweeperViewModel = viewModel()
             val theme by game.theme.collectAsStateWithLifecycle()
             val state by game.state.collectAsStateWithLifecycle()
             val gomokuState by gomoku.state.collectAsStateWithLifecycle()
+            val minesState by mines.state.collectAsStateWithLifecycle()
             BzxAndroidGamesTheme(theme) {
                 var splashVisible by rememberSaveable { mutableStateOf(true) }
                 var currentGame by rememberSaveable { mutableStateOf<String?>(null) }
@@ -139,14 +143,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 BackHandler(enabled = currentGame != null && !splashVisible) { currentGame = null }
-                AnimatedContent(
-                    targetState = when {
-                        splashVisible -> "intro"
-                        currentGame == "2048" -> "2048"
-                        currentGame == "gomoku" -> "gomoku"
-                        currentGame == "settings" -> "settings"
-                        else -> "library"
-                    },
+                    AnimatedContent(
+                        targetState = when {
+                            splashVisible -> "intro"
+                            currentGame == "2048" -> "2048"
+                            currentGame == "gomoku" -> "gomoku"
+                            currentGame == "mines" -> "mines"
+                            currentGame == "settings" -> "settings"
+                            else -> "library"
+                        },
                     transitionSpec = {
                         (fadeIn(tween(550)) + scaleIn(tween(550), initialScale = .96f)) togetherWith
                             (fadeOut(tween(380)) + scaleOut(tween(380), targetScale = 1.06f))
@@ -162,9 +167,20 @@ class MainActivity : ComponentActivity() {
                             state = gomokuState,
                             onSelectMode = gomoku::selectMode,
                             onSelectDifficulty = gomoku::selectDifficulty,
+                            onSelectBoardSkin = gomoku::selectBoardSkin,
                             onPlay = gomoku::play,
                             onUndo = gomoku::undo,
                             onRestart = gomoku::restart,
+                            onBack = { currentGame = null }
+                        )
+                    } else if (screen == "mines") {
+                        MinesweeperScreen(
+                            state = minesState,
+                            onReveal = mines::reveal,
+                            onToggleFlag = mines::toggleFlag,
+                            onToggleFlagMode = mines::toggleFlagMode,
+                            onSelectDifficulty = mines::selectDifficulty,
+                            onRestart = mines::restart,
                             onBack = { currentGame = null }
                         )
                     } else if (screen == "settings") {
@@ -176,6 +192,7 @@ class MainActivity : ComponentActivity() {
                         com.example.bzxandroidgames.ui.GameLibrary(
                             on2048 = { currentGame = "2048" },
                             onGomoku = { currentGame = "gomoku" },
+                            onMinesweeper = { currentGame = "mines" },
                             onSettings = { currentGame = "settings" },
                             onSkyVisibleChange = { librarySkyVisible = it }
                         )
