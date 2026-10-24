@@ -1,6 +1,6 @@
-# K60 2048
+# bzxandroidgames
 
-一款使用 Kotlin 与 Jetpack Compose 编写的简约 2048 Android 游戏。
+使用 Kotlin 与 Jetpack Compose 编写的 Android 小游戏合集，应用显示名为「小游戏合集」。目前提供可玩的 2048，以及其他游戏的预告入口。
 
 ## 环境
 
@@ -9,7 +9,7 @@
 - Android SDK 36
 - `minSdk 26`、`targetSdk 36`
 
-红米 K60 出厂 Android 13（API 33），也可运行在后续 HyperOS/Android 版本。项目支持全面屏、两套可切换主题与高密度屏幕。
+支持 Android 8.0（API 26）及以上设备、全面屏、两套可切换主题与高密度屏幕。
 
 ## 运行
 
@@ -17,7 +17,9 @@
 2. 等待 Gradle 同步（已按本机现有 `E:\androidsdk\sdk` 配置 Android SDK 36）。
 3. 连接手机并开启 USB 调试，选择设备后运行 `app`。
 
-也可以直接安装工程根目录中已构建的 `K60-2048-debug.apk`。
+也可以直接安装工程根目录中已构建的 `bzxandroidgames-debug.apk`（`小游戏合集-debug.apk` 为同一安装包的中文文件名副本）。
+
+运行 `gradlew :app:exportDebugApk` 可重新构建并更新这两个文件，英文文件名自动使用当前 Gradle 项目名。`assembleDebug` 的内部产物仍位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
 ## 主题切换
 
@@ -25,7 +27,9 @@
 
 ## 项目路径迁移
 
-当前项目位于 `E:\K60-2048`。项目引用使用相对路径或 `$PROJECT_DIR$`，可以整体移动后重新用 Android Studio 打开。移动目录后建议运行 `gradlew clean` 再重新构建，以重新生成包含旧绝对路径的构建缓存。
+当前项目位于 `E:\bzxandroidgames`，Gradle 项目名为 `bzxandroidgames`。项目引用使用相对路径或 `$PROJECT_DIR$`，可以整体移动后重新用 Android Studio 打开。移动目录后建议运行 `gradlew clean` 再重新构建，以重新生成包含旧绝对路径的构建缓存。
+
+源码与测试包名、Android namespace 统一为 `com.example.bzxandroidgames`，应用主题为 `BzxAndroidGamesTheme` / `Theme.BzxAndroidGames`。`applicationId` 有意保留为 `com.example.k602048`，用于让新版覆盖安装旧版并保留最高分、主题等本地数据；它是兼容标识，不随项目改名变更。
 
 `local.properties` 的 `sdk.dir` 和 `gradle.properties` 的可选 `org.gradle.java.home` 指向本机安装的 Android SDK 与 JDK，不需要随项目目录移动而更改。只有 SDK/JDK 安装位置发生变化或换用其他电脑时，才需要更新相应配置；也可以移除 `org.gradle.java.home`，交由 Android Studio 的 Gradle JDK 设置或 `JAVA_HOME` 管理 JDK。
 
@@ -55,6 +59,8 @@ BUILD SUCCESSFUL
 
 2026-10-23 验证：构建前已执行 `clean` 清理迁移前的构建产物；3 项核心规则单元测试通过，Lint 为 0 错误（保留 10 条现有的依赖版本、屏幕方向与资源建议）。Android 16 / API 36 模拟器已验证主题双向切换、进程重启后恢复主题、切换时保留棋盘与分数，以及纵向滑动和切换后的撤销。
 
+2026-10-24 改名验证：执行 `clean testDebugUnitTest assembleDebug lintDebug`，4 项核心规则单元测试通过，Lint 为 0 错误、3 条警告与 1 条提示；另已验证 `:app:exportDebugApk` 成功生成两个同内容安装包。APK 的启动类为 `com.example.bzxandroidgames.MainActivity`，安装标识和签名与旧版一致。此次未重新进行模拟器交互验证。
+
 ## 二次元启动演出
 
 启动页使用本地二次元插画、缓慢镜头运动、前景光粒、流星光轨与分阶段标题登场。时长约 4.2 秒，右上角可跳过；科技/自然主题分别使用对应氛围色与文案。无需联网播放。此为原生动画驱动的插画演出，非逐帧角色视频。
@@ -67,4 +73,4 @@ BUILD SUCCESSFUL
 
 ## 小游戏合集大厅
 
-应用名称为「小游戏合集」。启动页欢迎词为「欢迎来到bzx的小游戏世界！」，播放结束或跳过后进入游戏大厅。大厅提供 2048、贪吃蛇、俄罗斯方块、五子棋、连连看、蜘蛛纸牌、扫雷；目前仅 2048 可玩，其余入口点击显示「敬请期待」。2048 内的返回按钮及系统返回键均回到大厅；同一次运行中往返大厅保留棋盘。大厅支持两套主题。新版安装包：`小游戏合集-debug.apk`，原 `K60-2048-debug.apk` 同步更新以兼容旧入口。
+应用名称为「小游戏合集」。启动页欢迎词为「欢迎来到bzx的小游戏世界！」，播放结束或跳过后进入游戏大厅。大厅提供 2048、贪吃蛇、俄罗斯方块、五子棋、连连看、蜘蛛纸牌、扫雷；目前仅 2048 可玩，其余入口点击显示「敬请期待」。2048 内的返回按钮及系统返回键均回到大厅；同一次运行中往返大厅保留棋盘。大厅支持两套主题。安装包：`bzxandroidgames-debug.apk`，同时提供中文文件名副本 `小游戏合集-debug.apk`。

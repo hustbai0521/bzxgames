@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "K60 2048"
+rootProject.name = "bzxandroidgames"
 include(":app")

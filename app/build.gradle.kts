@@ -7,10 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.k602048"
+    namespace = "com.example.bzxandroidgames"
     compileSdk = 36
 
     defaultConfig {
+        // Keep the installed app identity so updates preserve existing user data.
         applicationId = "com.example.k602048"
         minSdk = 26
         targetSdk = 36
@@ -72,4 +73,20 @@ configurations.configureEach {
         "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1",
         "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.9.0"
     )
+}
+
+tasks.register("exportDebugApk") {
+    group = "distribution"
+    description = "Builds and exports debug APKs with the current project and display names."
+    dependsOn("assembleDebug")
+    val debugApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
+    val exportedApks = listOf(
+        rootProject.layout.projectDirectory.file("${rootProject.name}-debug.apk"),
+        rootProject.layout.projectDirectory.file("小游戏合集-debug.apk")
+    )
+    inputs.file(debugApk)
+    outputs.files(exportedApks)
+    doLast {
+        exportedApks.forEach { debugApk.get().asFile.copyTo(it.asFile, overwrite = true) }
+    }
 }
