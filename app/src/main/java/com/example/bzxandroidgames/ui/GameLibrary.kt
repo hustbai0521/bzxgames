@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bzxandroidgames.ui.theme.ShinkaiCountrysideBackdrop
@@ -54,6 +55,7 @@ fun GameLibrary(
     LaunchedEffect(Unit) { entered = true }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFF2F8F5))) {
+        val compactHeader = maxWidth < 360.dp
         val heroHeight = (maxHeight * .38f).coerceIn(290.dp, 380.dp)
         val skyThreshold = with(LocalDensity.current) { maxHeight.toPx() * .3f }
         val skyVisible by remember(skyThreshold) { derivedStateOf { scroll.value < skyThreshold } }
@@ -68,7 +70,11 @@ fun GameLibrary(
                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         BreezeMark(Modifier.size(22.dp), Color.White)
                         Spacer(Modifier.width(9.dp))
-                        Text("BZX / 小游戏合集", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.sp)
+                        Text("BZX / 小游戏合集", color = Color.White,
+                            fontSize = if (compactHeader) 11.sp else 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = if (compactHeader) .5.sp else 1.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Row(
                         Modifier.clip(CircleShape).background(Color.White.copy(alpha = .16f))

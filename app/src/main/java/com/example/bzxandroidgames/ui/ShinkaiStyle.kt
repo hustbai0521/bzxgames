@@ -3,16 +3,19 @@ package com.example.bzxandroidgames.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,35 +28,40 @@ internal val SoftInk = Color(0xFF5D777B)
 internal val SeaGlass = Color(0xFF368A91)
 internal val WarmRose = Color(0xFFB27C78)
 
-/** Classic gear button drawn as vector strokes, styled like the lobby's weather pill. */
+/** Reserve the full touch target; keep the smaller decorative circle inside it. */
 @Composable
 fun GearIconButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(27.dp)
+            .size(48.dp)
             .semantics { contentDescription = label }
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = .16f))
-            .border(.6.dp, Color.White.copy(alpha = .42f), CircleShape)
     ) {
-        Canvas(Modifier.size(14.dp)) {
-            val ink = Color.White
-            val stroke = 1.7.dp.toPx()
-            val ring = size.minDimension / 2f - stroke * 1.8f
-            drawCircle(ink, ring, center, style = Stroke(stroke))
-            repeat(8) { index ->
-                val angle = index * Math.PI / 4.0
-                val direction = Offset(cos(angle).toFloat(), sin(angle).toFloat())
-                drawLine(
-                    ink,
-                    center + direction * (ring * .84f),
-                    center + direction * (ring + stroke * .8f),
-                    stroke,
-                    StrokeCap.Round
-                )
+        Box(
+            Modifier.size(28.dp).clip(CircleShape)
+                .background(Color.White.copy(alpha = .16f))
+                .border(.6.dp, Color.White.copy(alpha = .42f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(Modifier.size(20.dp)) {
+                val radius = size.minDimension * .46f
+                val gear = Path().apply {
+                    fillType = PathFillType.EvenOdd
+                    repeat(8) { tooth ->
+                        // Flat tooth tips, recessed valleys, and a clear open center.
+                        val points = listOf(0f to .74f, .18f to .74f, .24f to 1f, .56f to 1f, .62f to .74f)
+                        points.forEachIndexed { index, (phase, scale) ->
+                            val angle = (tooth + phase) * Math.PI / 4.0
+                            val point = center + Offset(cos(angle).toFloat(), sin(angle).toFloat()) * radius * scale
+                            if (tooth == 0 && index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
+                        }
+                    }
+                    close()
+                    val hole = radius * .34f
+                    addOval(Rect(center - Offset(hole, hole), center + Offset(hole, hole)))
+                }
+                drawPath(gear, Color.White)
             }
-            drawCircle(ink, ring * .34f, center, style = Stroke(stroke * .7f))
         }
     }
 }
