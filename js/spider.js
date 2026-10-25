@@ -676,9 +676,9 @@
         g.node.style.left = g.originLeft + dx2 + "px";
         g.node.style.top = g.originTop + dy2 + "px";
       });
-      // hover target by run centre X
-      const boardRect = board.getBoundingClientRect();
-      const centerX = dragSession.originCenterX + dx2 - boardRect.left;
+      // hover target by run centre X（originCenterX 已是棋盘相对坐标，dx2 为视口位移，
+      // 棋盘本身不动，二者直接相加即是当前棋盘相对落点——不要再减 boardRect.left）
+      const centerX = dragSession.originCenterX + dx2;
       const target = targetColumnAt(centerX);
       const valid = target !== null && target !== dragSession.from &&
         canDrop(dragSession.cards, state.game.columns[target]);
@@ -950,11 +950,33 @@
 
     renderAll();
 
+    // 测试钩子：装载指定牌面复现问题（列 = 花色0黑桃的点数数组，仅最后一张自动翻开由 faceUp 控制）
+    window.__bzxSpiderDebug = {
+      load(columnsSpec) {
+        // spec: [{ down: [点数...], up: [点数...] }, ...]，全部按黑桃装载
+        history.length = 0;
+        const columns = columnsSpec.map((spec) => {
+          const cards = [];
+          (spec.down || []).forEach((r) => cards.push({ suit: 0, rank: r, faceUp: false }));
+          (spec.up || []).forEach((r) => cards.push({ suit: 0, rank: r, faceUp: true }));
+          return cards;
+        });
+        state.game = {
+          suits: "ONE", columns, stock: [], completed: [],
+          score: 500, moves: 0, status: "PLAYING", serial: 1, lastDealSerial: -1,
+        };
+        Object.assign(state, { selectedFrom: null, selectedIndex: null, canUndo: false, hint: null });
+        renderAll();
+      },
+      state,
+    };
+
     return () => {
       // 离开屏幕时若还有拖拽会话/残影，全部清掉
       document.querySelectorAll(".drag-ghost").forEach((n) => n.remove());
       dragSession = null;
       hoverTarget = null;
+      delete window.__bzxSpiderDebug;
       stopVignette();
       ro.disconnect();
       window.removeEventListener("blur", endDragAbruptly);
