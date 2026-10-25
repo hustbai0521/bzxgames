@@ -345,11 +345,13 @@
     col.appendChild(bottom);
 
     BZX.sfxButton(stockZone, () => {
+      if (dealing) return; // 发牌动画进行中，忽略连点
       const blocked = state.game.stock.length >= COLUMN_COUNT && state.game.columns.some((c) => c.length === 0);
       if (blocked) {
         BZX.toast(root, "有空列时不能发牌，先把牌填回去");
       } else if (doDeal()) {
         renderAll();
+        playDealAnimation();
       }
     });
 
@@ -475,6 +477,13 @@
           });
           if (isLifted) node.style.pointerEvents = "none";
           if (showTargetGlow && row === cards.length - 1) node.classList.add("target-glow");
+          // 发牌动画进行中：尚未落地的新牌先隐藏，等飞行牌到位再现身
+          if (dealing && freshDeal && row === cards.length - 1) {
+            if (column >= dealing.landed) {
+              node.classList.remove("deal-pop");
+              node.classList.add("dealing-hidden");
+            }
+          }
           node.style.top = y + "px";
           node.style.left = "0";
           colEl.appendChild(node);
@@ -544,10 +553,71 @@
       stockZone.classList.toggle("blocked", game.stock.length === 0);
     }
 
+    /* ---------------- 发牌动画：牌背从牌堆逐张飞向各列（左→右） ---------------- */
+
+    const DEAL_STAGGER = 60; // 相邻两列起飞间隔
+    const DEAL_FLIGHT = 200; // 单张飞行时长
+
+    function liveTopCard(col) {
+      const colEl = board.querySelectorAll(".spider-col-area")[col];
+      if (!colEl) return null;
+      const cards = colEl.querySelectorAll(".spider-card");
+      return cards.length ? cards[cards.length - 1] : null;
+    }
+
+    function playDealAnimation() {
+      dealing = { landed: 0 };
+      renderBoard(); // 新牌先隐藏，等飞行牌到位
+      const stockRect = stockPile.getBoundingClientRect();
+      for (let col = 0; col < COLUMN_COUNT; col++) {
+        let fly = null; // 本列的飞行牌，落地时移除
+        setTimeout(() => {
+          if (!dealing) return;
+          const target = liveTopCard(col);
+          if (!target) return;
+          const tr = target.getBoundingClientRect();
+          fly = cardBack(cardWidth);
+          fly.classList.add("deal-fly");
+          fly.style.position = "fixed";
+          fly.style.left = stockRect.left + "px";
+          fly.style.top = stockRect.top + "px";
+          fly.style.transform = "rotate(-10deg)";
+          document.body.appendChild(fly);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (!fly.isConnected) return;
+              const ease = "cubic-bezier(.25,.1,.25,1)";
+              fly.style.transition = "left " + DEAL_FLIGHT + "ms " + ease + ", top " + DEAL_FLIGHT + "ms " + ease + ", transform " + DEAL_FLIGHT + "ms ease-out";
+              fly.style.left = tr.left + "px";
+              fly.style.top = tr.top + "px";
+              fly.style.transform = "rotate(0deg)";
+            });
+          });
+        }, col * DEAL_STAGGER);
+        // 落地：多留 60ms 让飞行过渡走完（rAF 启动有延迟）
+        setTimeout(() => {
+          if (!dealing) return;
+          dealing.landed = Math.max(dealing.landed, col + 1);
+          if (fly) fly.remove();
+          const node = liveTopCard(col);
+          if (node) {
+            node.classList.remove("dealing-hidden");
+            node.classList.add("deal-pop");
+          }
+          if (col === COLUMN_COUNT - 1) {
+            setTimeout(() => {
+              if (dealing) { dealing = null; renderBoard(); }
+            }, 200);
+          }
+        }, col * DEAL_STAGGER + DEAL_FLIGHT + 60);
+      }
+    }
+
     /* ---------------- drag session ---------------- */
 
     let dragSession = null; // { from,index,cards,originX,originY,ghost[],moved }
     let hoverTarget = null;
+    let dealing = null; // 发牌动画进行中：{ landed: 已落地列数 }
 
     function attachDrag(node, column, row) {
       node.addEventListener("pointerdown", (e) => {
