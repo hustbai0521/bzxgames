@@ -570,6 +570,131 @@
 }
 .win-panel .wp-btn-back:hover { background: rgba(18, 135, 42, .1); }
 
+/* ================= 数独（固定清新自然风格） ================= */
+
+.sudoku-board-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--board-surface);
+  border: 2px solid rgba(50, 115, 79, .38);
+  box-shadow: 0 14px 34px rgba(50, 115, 79, .18);
+  border-radius: 18px;
+  padding: 6px;
+  user-select: none;
+}
+.sudoku-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+}
+.sudoku-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid rgba(50, 115, 79, .22);
+  border-bottom: 1px solid rgba(50, 115, 79, .22);
+  cursor: pointer;
+  transition: background .1s;
+}
+.sudoku-cell:nth-child(9n) { border-right: none; }
+.sudoku-cell:nth-child(n + 73) { border-bottom: none; }
+.sudoku-cell.b-right { border-right: 2px solid rgba(50, 115, 79, .6); }
+.sudoku-cell.b-bottom { border-bottom: 2px solid rgba(50, 115, 79, .6); }
+.sudoku-cell .sudoku-val {
+  font-size: clamp(16px, 4.6vw, 27px);
+  font-weight: 700;
+}
+.sudoku-cell.given .sudoku-val { color: #234733; }
+.sudoku-cell.user .sudoku-val { color: #28776C; }
+.sudoku-cell.peer { background: rgba(50, 115, 79, .07); }
+.sudoku-cell.sel { background: rgba(50, 115, 79, .16); }
+.sudoku-cell.same { background: rgba(143, 107, 37, .18); }
+.sudoku-cell.conflict .sudoku-val { color: #C25B4E; }
+.sudoku-notes {
+  position: absolute;
+  inset: 1px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+.sudoku-notes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(7px, 1.7vw, 10px);
+  font-weight: 600;
+  color: #50674C;
+  line-height: 1;
+}
+
+.sudoku-pad {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.sudoku-num { width: 46px; height: 46px; font-size: 21px; }
+.sudoku-num.num-done { opacity: .35; }
+
+.sudoku-tools {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.sudoku-note-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 50px;
+  padding: 9px 16px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.sudoku-note-toggle .snt-pen { font-size: 14px; }
+.sudoku-note-toggle .snt-state { font-weight: 900; }
+.sudoku-note-toggle.active {
+  background: var(--secondary);
+  color: #fff;
+  border-color: var(--secondary);
+}
+
+.sudoku-diff-row { display: flex; gap: 10px; }
+.sudoku-seg {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(80, 103, 76, .35);
+  background: rgba(247, 250, 239, .72);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.sudoku-seg .so-row { display: flex; align-items: center; gap: 6px; }
+.sudoku-seg .so-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(80, 103, 76, .4); }
+.sudoku-seg .so-label { color: #234733; font-size: 13px; font-weight: 500; }
+.sudoku-seg .so-caption { color: #50674C; font-size: 10px; }
+.sudoku-seg:hover { background: rgba(255, 255, 255, .85); }
+.sudoku-seg.selected {
+  border-width: 1.5px;
+  border-color: #32734F;
+  background: rgba(50, 115, 79, .1);
+}
+.sudoku-seg.selected .so-dot { background: #32734F; }
+.sudoku-seg.selected .so-label { font-weight: 700; }
+
 /* ---------------- 桌面宽屏适配（≥900px） ---------------- */
 
 /* 五子棋棋盘列：窄屏也保持内容居中 */

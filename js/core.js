@@ -339,6 +339,7 @@
     snake: { title: "贪吃蛇 · BZX 小游戏合集", mount: (root) => BZX.SnakeScreen(root) },
     tetris: { title: "俄罗斯方块 · BZX 小游戏合集", mount: (root) => BZX.TetrisScreen(root) },
     link: { title: "连连看 · BZX 小游戏合集", mount: (root) => BZX.LinkScreen(root) },
+    sudoku: { title: "数独 · BZX 小游戏合集", mount: (root) => BZX.SudokuScreen(root) },
     spider: { title: "蜘蛛纸牌 · BZX 小游戏合集", mount: (root) => BZX.SpiderScreen(root) },
   };
 

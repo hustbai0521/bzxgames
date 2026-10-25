@@ -74,7 +74,7 @@
     /* ---------- 下一站，小惊喜 ---------- */
     const upHeader = el("div", "upcoming-header");
     upHeader.appendChild(el("div", "uh-title", "下一站，小惊喜"));
-    upHeader.appendChild(el("div", "uh-sub", "5 款全上线"));
+    upHeader.appendChild(el("div", "uh-sub", "6 款全上线"));
     section.appendChild(upHeader);
 
     const games = [
@@ -83,6 +83,7 @@
       { name: "连连看", subtitle: "遇见成双的美好", icon: 2, route: "link" },
       { name: "蜘蛛纸牌", subtitle: "理好每一手牌", icon: 3, route: "spider" },
       { name: "扫雷", subtitle: "每一步都是灵感", icon: 4, route: "mines" },
+      { name: "数独", subtitle: "静下心来的推演", icon: 5, route: "sudoku" },
     ];
     const grid = el("div", "upcoming-grid");
     for (let i = 0; i < games.length; i += 2) {
@@ -338,6 +339,27 @@
       ctx.stroke();
       ctx.fillStyle = ink;
       ctx.beginPath(); ctx.arc(w * 0.61, h * 0.56, w * 0.1, 0, Math.PI * 2); ctx.fill();
+    } else if (kind === 5) { // 数独：3×3 九宫格 + 中央已填一子
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, w * 0.08, h * 0.08, w * 0.84, h * 0.84, 3);
+      ctx.stroke();
+      ctx.lineWidth = 1.1;
+      for (let i = 1; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(w * (0.08 + 0.28 * i), h * 0.08);
+        ctx.lineTo(w * (0.08 + 0.28 * i), h * 0.92);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(w * 0.08, h * (0.08 + 0.28 * i));
+        ctx.lineTo(w * 0.92, h * (0.08 + 0.28 * i));
+        ctx.stroke();
+      }
+      ctx.fillStyle = hexA(C.SeaGlass, 0.85);
+      ctx.beginPath(); ctx.arc(w * 0.5, h * 0.5, w * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hexA(C.SeaGlass, 0.4);
+      ctx.beginPath(); ctx.arc(w * (0.08 + 0.14), h * (0.08 + 0.14), w * 0.055, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(w * (0.92 - 0.14), h * (0.92 - 0.14), w * 0.055, 0, Math.PI * 2); ctx.fill();
     } else { // 扫雷
       ctx.strokeStyle = ink;
       ctx.lineWidth = 1.6;
