@@ -382,21 +382,34 @@
 
     /* MergeParticleBurst */
     let burstStop = null;
+    function clearBurstCanvas() {
+      // 用恒等变换清空整个物理像素画布，防止上一轮特效残帧滞留
+      const c = burstCanvas.getContext("2d");
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, burstCanvas.width, burstCanvas.height);
+      c.restore();
+    }
     function burst(cells) {
-      if (burstStop) burstStop();
+      if (burstStop) { burstStop(); burstStop = null; }
+      clearBurstCanvas(); // 无合并的移动也要清：上一轮特效可能正播到一半
       if (!cells.length) return;
       const fit = BZX.fitCanvas(burstCanvas);
       const start = performance.now();
-      const progress = { v: 0 };
-      burstStop = BZX.animLoop(
+      let stopMe = null;
+      stopMe = BZX.animLoop(
         () => {
-          progress.v = Math.min(1, (performance.now() - start) / 760);
+          const p = Math.min(1, (performance.now() - start) / 760);
           fit.resize();
           const { ctx, state: s } = fit;
           const { w, h } = s;
           ctx.clearRect(0, 0, w, h);
-          const p = progress.v;
-          if (p >= 1) return;
+          if (p >= 1) {
+            // 播完自停，不再空转
+            if (stopMe) stopMe();
+            burstStop = null;
+            return;
+          }
           const fade = 1 - p;
           const gap = 9, inset = 10;
           const cellSize = (w - inset * 2 - gap * 3) / 4;
