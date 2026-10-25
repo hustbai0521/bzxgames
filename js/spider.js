@@ -355,13 +355,17 @@
 
     /* dimensions */
     let cardWidth = 80;
+    let boardOffset = 0;
     function layout() {
       const w = board.clientWidth;
-      cardWidth = (w - 12 - 3 * 9) / 10;
+      // 超宽屏上限 130px：牌太大反而失真；列整体在桌面居中
+      cardWidth = Math.min((w - 12 - 3 * 9) / 10, 130);
+      const total = 12 + 10 * (cardWidth + 3) - 3;
+      boardOffset = Math.max(0, (w - total) / 2);
     }
 
     function columnX(column) {
-      return 6 + (cardWidth + 3) * column;
+      return boardOffset + 6 + (cardWidth + 3) * column;
     }
 
     function targetColumnAt(centerX) {

@@ -308,13 +308,19 @@
     root.appendChild(backdrop);
     const stopInk = BZX.inkWash(backdrop);
 
-    const col = el("div", "portrait-col scroll-col");
+    const col = el("div", "portrait-col scroll-col gomoku-col");
     col.style.padding = "22px 22px 0";
     root.appendChild(col);
 
+    // 信息列（窄屏时与棋盘上下堆叠，宽屏时左右分栏）
+    const infoCol = el("div", "gomoku-info");
+    const boardCol = el("div", "gomoku-boardcol");
+    col.appendChild(infoCol);
+    col.appendChild(boardCol);
+
     const backBtn = el("button", "back-btn", "‹  返回游戏大厅");
     BZX.sfxButton(backBtn, () => BZX.router.backToLibrary());
-    col.appendChild(backBtn);
+    infoCol.appendChild(backBtn);
 
     /* header */
     const header = el("div");
@@ -341,7 +347,7 @@
     })());
     header.appendChild(hRow);
     header.appendChild(spacer(20));
-    col.appendChild(header);
+    infoCol.appendChild(header);
 
     const cards = el("div");
     cards.style.cssText = "display:flex;gap:11px;";
@@ -352,11 +358,11 @@
     cards.appendChild(moveCard);
     header.appendChild(cards);
 
-    col.appendChild(spacer(18));
+    infoCol.appendChild(spacer(18));
 
     /* pickers */
     const modeRow = el("div", "segment-row");
-    col.appendChild(modeRow);
+    infoCol.appendChild(modeRow);
     const pveBlock = el("div");
     pveBlock.style.cssText = "overflow:hidden;max-height:0;opacity:0;transition:max-height 260ms ease,opacity 260ms ease;";
     const pveInner = el("div");
@@ -367,7 +373,7 @@
     const sideRow = el("div", "segment-row");
     pveInner.appendChild(sideRow);
     pveBlock.appendChild(pveInner);
-    col.appendChild(pveBlock);
+    infoCol.appendChild(pveBlock);
 
     function segmentOption(row, label, caption, selected, onClick) {
       // 只负责追加一个选项；清空由调用方在重建整行时做一次
@@ -428,35 +434,35 @@
       renderAll();
     }
 
-    col.appendChild(spacer(20));
+    infoCol.appendChild(spacer(20));
     const caption = el("div");
     caption.style.cssText = "color:" + P.InkMuted + ";font-size:10px;letter-spacing:2px;text-align:center;";
-    col.appendChild(caption);
-    col.appendChild(spacer(12));
+    infoCol.appendChild(caption);
+    infoCol.appendChild(spacer(12));
 
     /* board shop entry */
     const shopEntry = el("button", "shop-entry");
     BZX.sfxButton(shopEntry, openShop);
-    col.appendChild(shopEntry);
-    col.appendChild(spacer(16));
+    infoCol.appendChild(shopEntry);
+    infoCol.appendChild(spacer(16));
 
     /* board */
     const boardWrap = el("div", "gomoku-board-wrap");
     const boardCanvas = el("canvas");
     boardWrap.appendChild(boardCanvas);
-    col.appendChild(boardWrap);
-    col.appendChild(spacer(18));
+    boardCol.appendChild(boardWrap);
+    boardCol.appendChild(spacer(18));
 
     const hintPill = el("div", "hint-pill");
     hintPill.style.cssText =
       "background:rgba(51,41,28,.06);border:1px solid rgba(51,41,28,.18);color:" + P.InkMuted + ";align-self:center;";
     hintPill.style.setProperty("--x", "0");
     hintPill.innerHTML = '<i style="width:6px;height:6px;border-radius:50%;background:' + P.Seal + ';margin-right:8px;display:inline-block;"></i><span></span>';
-    col.appendChild(hintPill);
-    col.appendChild(spacer(24));
+    boardCol.appendChild(hintPill);
+    boardCol.appendChild(spacer(24));
     const footNote = el("div", null, "轻点交点落子 · 连成五子者胜");
     footNote.style.cssText = "color:" + P.InkMuted + ";font-size:9px;letter-spacing:1.4px;text-align:center;padding-bottom:18px;";
-    col.appendChild(footNote);
+    boardCol.appendChild(footNote);
 
     /* shop dialog */
     function openShop() {

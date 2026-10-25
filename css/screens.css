@@ -374,4 +374,31 @@
   padding: 24px 0;
 }
 
+/* ---------------- 桌面宽屏适配（≥900px） ---------------- */
+
+@media (min-width: 900px) {
+  /* 大厅与设置页：内容区 600 → 920 */
+  .lobby .lobby-scroll, .settings .settings-scroll {
+    max-width: 920px;
+    padding: 0 32px;
+  }
+  .lobby-hero { min-height: clamp(320px, 40vh, 420px); }
+  .lobby-headline .lh-title { font-size: 42px; line-height: 58px; }
+  .lobby-section-row .lsr-title { font-size: 24px; }
+  .playable-card { padding: 20px; gap: 9px; }
+  .playable-card .pc-art { height: 116px; }
+  .playable-card .pc-title { font-size: 30px; line-height: 42px; min-height: 46px; }
+  .playable-card .pc-sub { font-size: 11px; }
+  .upcoming-header .uh-title { font-size: 19px; }
+  .upcoming-card { min-height: 100px; padding: 16px 15px; border-radius: 19px; }
+  .upcoming-card .uc-name { font-size: 15px; }
+  .upcoming-card .uc-sub { font-size: 10px; }
+  .upcoming-card .uc-go { font-size: 9px; }
+  .upcoming-card .uc-icon { flex: 0 0 32px; }
+  .settings-hero .sh-title { font-size: 40px; line-height: 54px; }
+  .settings-sidebar { width: 172px; flex: 0 0 172px; }
+  .sidebar-entry { padding: 16px 14px; }
+  .sidebar-entry .se-title { font-size: 14px; }
+}
+
 .collapse-anim { animation: section-swap 260ms cubic-bezier(.2,0,0,1) both; overflow: hidden; }

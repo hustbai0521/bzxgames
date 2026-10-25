@@ -52,6 +52,11 @@ button:focus-visible { outline: 2px solid rgba(120, 170, 255, .7); outline-offse
   padding: 0 20px;
 }
 
+/* 桌面宽屏：游戏列适度加宽，背景动画铺满全屏，居中不显空旷 */
+@media (min-width: 900px) {
+  .portrait-col { max-width: 560px; }
+}
+
 /* ---------- shared text buttons / pills ---------- */
 
 .back-btn {
@@ -135,8 +140,7 @@ button:focus-visible { outline: 2px solid rgba(120, 170, 255, .7); outline-offse
   padding: 8px 15px;
   font-size: 12px;
   white-space: nowrap;
-}
-.hint-pill::before {
+}.hint-pill::before {
   content: "";
   width: 6px; height: 6px;
   border-radius: 50%;

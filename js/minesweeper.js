@@ -326,15 +326,16 @@
       flagToggle.className = "bevel-box flag-mode-btn " + (state.flagMode ? "sunken active" : "raised");
       flagToggle.innerHTML = "";
       const content = el("div", "bevel-content");
-      content.appendChild(svgWrap(flagIcon(15)));
+      content.appendChild(svgWrap(flagIcon(15), 15, 15));
       content.appendChild(el("div", "fm-label", "插旗模式"));
       content.appendChild(el("div", "fm-state", state.flagMode ? "开" : "关"));
       flagToggle.appendChild(content);
     }
 
     function computeCellSize() {
-      const maxW = Math.min(window.innerWidth - 36, 480 - 36);
-      const maxH = window.innerHeight - 380;
+      // 宽屏时列会放宽到 560px，格子按可用宽度与高度取小
+      const maxW = Math.min(window.innerWidth - 36, 524);
+      const maxH = window.innerHeight - 350;
       const byW = (maxW - 12) / state.level.cols;
       const byH = Math.max(13, maxH) / state.level.rows;
       cellPx = Math.max(13, Math.floor(Math.min(byW, byH)));
@@ -502,10 +503,11 @@
 
   /* ---------------- Win98 icons ---------------- */
 
-  // SVG 字符串包装成节点
-  function svgWrap(svgHtml) {
+  // SVG 字符串包装成节点；可给定尺寸避免 100% 宽高失控
+  function svgWrap(svgHtml, w, h) {
     const span = el("span");
-    span.style.cssText = "display:inline-flex;align-items:center;justify-content:center;line-height:0;";
+    span.style.cssText = "display:inline-flex;align-items:center;justify-content:center;line-height:0;" +
+      (w ? "width:" + w + "px;height:" + (h || w) + "px;flex:0 0 " + w + "px;" : "");
     span.innerHTML = svgHtml;
     return span;
   }

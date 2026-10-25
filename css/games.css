@@ -339,6 +339,7 @@
 .bevel-box .bevel-content { padding: 2px; position: relative; z-index: 1; height: 100%; width: 100%; }
 
 .mines .difficulty-row { display: flex; gap: 8px; justify-content: center; }
+.mines .flag-mode-btn { align-self: center; }
 .mines .difficulty-btn { cursor: pointer; font-size: 13px; }
 .mines .difficulty-btn .bevel-content { padding: 7px 17px; color: var(--ink); font-weight: 500; white-space: nowrap; }
 .mines .difficulty-btn.selected .bevel-content { color: var(--danger); font-weight: 900; }
@@ -558,3 +559,48 @@
   transition: background .15s;
 }
 .win-panel .wp-btn-back:hover { background: rgba(18, 135, 42, .1); }
+
+/* ---------------- 桌面宽屏适配（≥900px） ---------------- */
+
+/* 五子棋棋盘列：窄屏也保持内容居中 */
+.gomoku-boardcol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .tetris-side { width: 120px; flex: 0 0 120px; }
+  .score-card { padding: 15px 20px; }
+  .score-card .sc-value { font-size: 26px; }
+
+  /* 五子棋：左信息面板 + 右大棋盘 */
+  .gomoku-col {
+    max-width: 1120px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 30px;
+    padding: 24px 30px 0 !important;
+  }
+  .gomoku-info {
+    flex: 0 0 340px;
+    width: 340px;
+    overflow-y: auto;
+    max-height: 100%;
+    padding-bottom: 24px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(138, 122, 96, .35) transparent;
+  }
+  .gomoku-info::-webkit-scrollbar { width: 6px; }
+  .gomoku-info::-webkit-scrollbar-thumb { background: rgba(138, 122, 96, .3); border-radius: 3px; }
+  .gomoku-boardcol {
+    flex: 1;
+    justify-content: center;
+    padding-bottom: 18px;
+  }
+  .gomoku-boardcol .gomoku-board-wrap {
+    width: min(100%, calc(100vh - 170px));
+  }
+  .gomoku-boardcol .hint-pill { margin-top: 16px; }
+}
