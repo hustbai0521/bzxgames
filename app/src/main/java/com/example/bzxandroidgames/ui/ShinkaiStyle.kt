@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.bzxandroidgames.sound.clickSfx
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -32,7 +33,7 @@ internal val WarmRose = Color(0xFFB27C78)
 @Composable
 fun GearIconButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     IconButton(
-        onClick = onClick,
+        onClick = clickSfx(onClick),
         modifier = modifier
             .size(48.dp)
             .semantics { contentDescription = label }

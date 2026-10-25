@@ -1,5 +1,6 @@
 package com.example.bzxandroidgames
 
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -54,6 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -100,8 +102,13 @@ import com.example.bzxandroidgames.game.Game2048
 import com.example.bzxandroidgames.game.GomokuViewModel
 import com.example.bzxandroidgames.game.MinesweeperViewModel
 import com.example.bzxandroidgames.game.MoveResult
+import com.example.bzxandroidgames.game.SpiderViewModel
+import com.example.bzxandroidgames.sound.LocalSoundController
+import com.example.bzxandroidgames.sound.SoundController
+import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.ui.GomokuScreen
 import com.example.bzxandroidgames.ui.MinesweeperScreen
+import com.example.bzxandroidgames.ui.SpiderScreen
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -114,11 +121,15 @@ class MainActivity : ComponentActivity() {
             val game: GameViewModel = viewModel()
             val gomoku: GomokuViewModel = viewModel()
             val mines: MinesweeperViewModel = viewModel()
+            val spider: SpiderViewModel = viewModel()
             val theme by game.theme.collectAsStateWithLifecycle()
             val state by game.state.collectAsStateWithLifecycle()
             val gomokuState by gomoku.state.collectAsStateWithLifecycle()
             val minesState by mines.state.collectAsStateWithLifecycle()
-            BzxAndroidGamesTheme(theme) {
+            val spiderState by spider.state.collectAsStateWithLifecycle()
+            val sound = remember { SoundController(applicationContext) }
+            CompositionLocalProvider(LocalSoundController provides sound) {
+                BzxAndroidGamesTheme(theme) {
                 var splashVisible by rememberSaveable { mutableStateOf(true) }
                 var currentGame by rememberSaveable { mutableStateOf<String?>(null) }
                 var librarySkyVisible by remember { mutableStateOf(true) }
@@ -143,12 +154,20 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 BackHandler(enabled = currentGame != null && !splashVisible) { currentGame = null }
+                // Spider is a landscape game; everywhere else keeps the manifest's portrait lock.
+                LaunchedEffect(currentGame) {
+                    requestedOrientation = if (currentGame == "spider")
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    else
+                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
                     AnimatedContent(
                         targetState = when {
                             splashVisible -> "intro"
                             currentGame == "2048" -> "2048"
                             currentGame == "gomoku" -> "gomoku"
                             currentGame == "mines" -> "mines"
+                            currentGame == "spider" -> "spider"
                             currentGame == "settings" -> "settings"
                             else -> "library"
                         },
@@ -168,6 +187,7 @@ class MainActivity : ComponentActivity() {
                             onSelectMode = gomoku::selectMode,
                             onSelectDifficulty = gomoku::selectDifficulty,
                             onSelectBoardSkin = gomoku::selectBoardSkin,
+                            onSelectHumanColor = gomoku::selectHumanColor,
                             onPlay = gomoku::play,
                             onUndo = gomoku::undo,
                             onRestart = gomoku::restart,
@@ -183,6 +203,22 @@ class MainActivity : ComponentActivity() {
                             onRestart = mines::restart,
                             onBack = { currentGame = null }
                         )
+                    } else if (screen == "spider") {
+                        SpiderScreen(
+                            state = spiderState,
+                            onBack = { currentGame = null },
+                            onTapCard = spider::tapCard,
+                            onTapColumn = spider::tapColumn,
+                            onDropRun = spider::dropRun,
+                            onSelectRun = spider::selectRun,
+                            onClearSelection = spider::clearSelection,
+                            onDeal = spider::deal,
+                            onUndo = spider::undo,
+                            onRestart = spider::restart,
+                            onHint = spider::requestHint,
+                            onSelectSuits = spider::setSuits,
+                            onClearHint = spider::clearHint
+                        )
                     } else if (screen == "settings") {
                         com.example.bzxandroidgames.ui.SettingsScreen(
                             onBack = { currentGame = null },
@@ -193,10 +229,12 @@ class MainActivity : ComponentActivity() {
                             on2048 = { currentGame = "2048" },
                             onGomoku = { currentGame = "gomoku" },
                             onMinesweeper = { currentGame = "mines" },
+                            onSpider = { currentGame = "spider" },
                             onSettings = { currentGame = "settings" },
                             onSkyVisibleChange = { librarySkyVisible = it }
                         )
                     }
+                }
                 }
             }
         }
@@ -255,7 +293,7 @@ private fun GameScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(22.dp))
-            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text("‹  返回游戏大厅", color = palette.primary) }
+            TextButton(onClick = clickSfx(onBack), modifier = Modifier.align(Alignment.Start)) { Text("‹  返回游戏大厅", color = palette.primary) }
             Header(state, onUndo, onRestart)
             Spacer(Modifier.height(18.dp))
             ThemePicker(palette.theme, onThemeChange)
@@ -334,7 +372,7 @@ private fun ScoreCard(label: String, value: Int, accent: Color, modifier: Modifi
 private fun RoundAction(symbol: String, label: String, enabled: Boolean, action: () -> Unit) {
     val palette = LocalGamePalette.current
     IconButton(
-        onClick = action,
+        onClick = clickSfx(action),
         enabled = enabled,
         modifier = Modifier
             .size(48.dp)
@@ -630,10 +668,10 @@ private fun ResultDialog(won: Boolean, score: Int, onRestart: () -> Unit, onKeep
             )
         },
         confirmButton = {
-            Button(onClick = onRestart, colors = ButtonDefaults.buttonColors(containerColor = palette.secondary, contentColor = Color.White)) { Text(if (palette.isNature) "重新开始" else "重新启动") }
+            Button(onClick = clickSfx(onRestart), colors = ButtonDefaults.buttonColors(containerColor = palette.secondary, contentColor = Color.White)) { Text(if (palette.isNature) "重新开始" else "重新启动") }
         },
         dismissButton = onKeepPlaying?.let { action ->
-            { TextButton(onClick = action) { Text(if (palette.isNature) "继续生长" else "继续突破", color = palette.primary) } }
+            { TextButton(onClick = clickSfx(action)) { Text(if (palette.isNature) "继续生长" else "继续突破", color = palette.primary) } }
         }
     )
 }

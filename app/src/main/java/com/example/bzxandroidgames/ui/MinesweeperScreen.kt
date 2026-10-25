@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bzxandroidgames.game.Minesweeper
+import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.game.MinesweeperCell
 import com.example.bzxandroidgames.game.MinesweeperDifficulty
 import com.example.bzxandroidgames.game.MinesweeperStatus
@@ -101,7 +102,7 @@ fun MinesweeperScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(14.dp))
-            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) {
+            TextButton(onClick = clickSfx(onBack), modifier = Modifier.align(Alignment.Start)) {
                 Text("‹  返回游戏大厅", color = Ink)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -147,7 +148,7 @@ private fun DifficultyPicker(selected: MinesweeperDifficulty, onSelect: (Mineswe
         MinesweeperDifficulty.entries.forEach { level ->
             BevelBox(
                 raised = level != selected,
-                modifier = Modifier.clickable(onClickLabel = level.title, onClick = { onSelect(level) })
+                modifier = Modifier.clickSfx(onClickLabel = level.title, onClick = { onSelect(level) })
             ) {
                 Text(
                     level.title,
@@ -206,7 +207,7 @@ private fun SmileyButton(status: MinesweeperStatus, onRestart: () -> Unit) {
         raised = true,
         modifier = Modifier
             .size(44.dp)
-            .clickable(onClickLabel = "重新开始", onClick = onRestart)
+            .clickSfx(onClickLabel = "重新开始", onClick = onRestart)
             .semantics { contentDescription = "重新开始" }
     ) {
         Canvas(Modifier.fillMaxSize().padding(4.dp)) { drawFace(face) }
@@ -368,7 +369,7 @@ private fun FlagModeToggle(active: Boolean, onToggle: () -> Unit) {
     BevelBox(
         raised = !active,
         modifier = Modifier
-            .clickable(onClickLabel = "切换插旗模式", onClick = onToggle)
+            .clickSfx(onClickLabel = "切换插旗模式", onClick = onToggle)
             .semantics { contentDescription = "切换插旗模式" }
     ) {
         Row(
@@ -449,10 +450,10 @@ private fun MinesweeperResultDialog(state: MinesweeperUiState, onRestart: () -> 
             )
         },
         confirmButton = {
-            TextButton(onClick = onRestart) { Text("再来一局", color = Ink, fontWeight = FontWeight.Bold) }
+            TextButton(onClick = clickSfx(onRestart)) { Text("再来一局", color = Ink, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = onReview) { Text("看看棋盘", color = InkMuted) }
+            TextButton(onClick = clickSfx(onReview)) { Text("看看棋盘", color = InkMuted) }
         }
     )
 }

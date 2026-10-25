@@ -43,10 +43,14 @@ object Gomoku {
     private const val SCORE_TWO = 120
     private const val SCORE_ONE = 20
 
-    private const val SEARCH_DEPTH = 4
-    private const val ROOT_WIDTH = 12
-    private const val NODE_WIDTH = 8
+    // Search profiles per difficulty: MEDIUM reads the opponent's best reply before
+    // committing; HARD digs six plies along forcing lines (fours and fives rank first
+    // in the move ordering, so the narrow width still covers all tactics).
+    private val MEDIUM_SEARCH = SearchProfile(depth = 2, rootWidth = 14, nodeWidth = 12)
+    private val HARD_SEARCH = SearchProfile(depth = 6, rootWidth = 10, nodeWidth = 6)
     private val WIN_SCORE = SCORE_FIVE * 100L
+
+    private class SearchProfile(val depth: Int, val rootWidth: Int, val nodeWidth: Int)
 
     private val DIRECTIONS = arrayOf(
         intArrayOf(1, 0), intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, -1)
@@ -101,9 +105,9 @@ object Gomoku {
 
     /**
      * Picks the AI reply. Every level takes a finishing five and blocks the opponent's
-     * immediate five; beyond that EASY is greedy with heavy noise and half-weighted defense,
-     * MEDIUM plays the greedy attack+defense cell, and HARD searches four plies of
-     * alpha-beta over candidates ordered by the same heuristic.
+     * immediate five; beyond that EASY is greedy with mild noise and slightly relaxed
+     * defense, MEDIUM searches two plies (its move plus the opponent's best reply), and
+     * HARD searches six plies of alpha-beta over candidates ordered by the same heuristic.
      */
     fun bestMove(
         board: List<Int>,
@@ -122,8 +126,8 @@ object Gomoku {
 
         return when (difficulty) {
             GomokuDifficulty.EASY -> pickEasy(grid, candidates, player, foe, random)
-            GomokuDifficulty.MEDIUM -> pickGreedy(grid, candidates, player, foe)
-            GomokuDifficulty.HARD -> pickSearch(grid, candidates, player, foe)
+            GomokuDifficulty.MEDIUM -> pickSearch(grid, candidates, player, foe, MEDIUM_SEARCH)
+            GomokuDifficulty.HARD -> pickSearch(grid, candidates, player, foe, HARD_SEARCH)
         }
     }
 
@@ -215,28 +219,21 @@ object Gomoku {
         random: Random
     ): Int {
         val scored = candidates.map { cell ->
-            val base = pointScore(grid, cell, player) + pointScore(grid, cell, foe) * 0.55
-            cell to base * (0.55 + random.nextDouble() * 0.9)
+            val base = pointScore(grid, cell, player) + pointScore(grid, cell, foe) * 0.75
+            cell to base * (0.7 + random.nextDouble() * 0.6)
         }.sortedByDescending { it.second }
-        val pool = scored.take(minOf(4, scored.size))
+        val pool = scored.take(3)
         return pool[random.nextInt(pool.size)].first
     }
 
-    private fun pickGreedy(grid: IntArray, candidates: List<Int>, player: Int, foe: Int): Int {
-        var bestCell = candidates.first()
-        var bestScore = Int.MIN_VALUE
-        for (cell in candidates) {
-            val score = pointScore(grid, cell, player) + pointScore(grid, cell, foe)
-            if (score > bestScore) {
-                bestScore = score
-                bestCell = cell
-            }
-        }
-        return bestCell
-    }
-
-    private fun pickSearch(grid: IntArray, candidates: List<Int>, player: Int, foe: Int): Int {
-        val ordered = orderMoves(grid, candidates, player, foe).take(ROOT_WIDTH)
+    private fun pickSearch(
+        grid: IntArray,
+        candidates: List<Int>,
+        player: Int,
+        foe: Int,
+        profile: SearchProfile
+    ): Int {
+        val ordered = orderMoves(grid, candidates, player, foe).take(profile.rootWidth)
         var bestCell = ordered.first().first
         var alpha = Long.MIN_VALUE / 4
         val beta = Long.MAX_VALUE / 4
@@ -244,7 +241,7 @@ object Gomoku {
             val gain = pointScore(grid, cell, player)
             grid[cell] = player
             val score = if (gain >= SCORE_FIVE) WIN_SCORE
-                else -negamax(grid, SEARCH_DEPTH - 1, foe, -beta, -alpha, 0L, gain.toLong())
+                else -negamax(grid, profile.depth - 1, foe, -beta, -alpha, 0L, gain.toLong(), profile)
             grid[cell] = EMPTY
             if (score > alpha) {
                 alpha = score
@@ -265,19 +262,20 @@ object Gomoku {
         alphaIn: Long,
         betaIn: Long,
         mySum: Long,
-        foeSum: Long
+        foeSum: Long,
+        profile: SearchProfile
     ): Long {
         if (depth == 0) return mySum - foeSum
         val foe = opponent(toMove)
-        val moves = orderMoves(grid, candidateCells(grid), toMove, foe).take(NODE_WIDTH)
+        val moves = orderMoves(grid, candidateCells(grid), toMove, foe).take(profile.nodeWidth)
         if (moves.isEmpty()) return 0L
         var best = Long.MIN_VALUE / 4
         var alpha = alphaIn
         for ((cell, _) in moves) {
             val gain = pointScore(grid, cell, toMove)
-            if (gain >= SCORE_FIVE) return WIN_SCORE - (SEARCH_DEPTH - depth)
+            if (gain >= SCORE_FIVE) return WIN_SCORE + depth
             grid[cell] = toMove
-            val score = -negamax(grid, depth - 1, foe, -betaIn, -alpha, foeSum, mySum + gain)
+            val score = -negamax(grid, depth - 1, foe, -betaIn, -alpha, foeSum, mySum + gain, profile)
             grid[cell] = EMPTY
             if (score > best) {
                 best = score

@@ -63,6 +63,17 @@ class GomokuTest {
         }
     }
 
+    @Test fun `ai playing black blocks a white five and opens the center`() {
+        val b = board(
+            idx(3, 4) to Gomoku.WHITE, idx(4, 4) to Gomoku.WHITE,
+            idx(5, 4) to Gomoku.WHITE, idx(6, 4) to Gomoku.WHITE,
+            idx(0, 0) to Gomoku.BLACK
+        )
+        val move = Gomoku.bestMove(b, Gomoku.BLACK, GomokuDifficulty.HARD, Random(5))
+        assertTrue(move == idx(2, 4) || move == idx(7, 4))
+        assertEquals(idx(7, 7), Gomoku.bestMove(Gomoku.emptyBoard(), Gomoku.BLACK, GomokuDifficulty.MEDIUM))
+    }
+
     @Test fun `winning outranks blocking for the ai`() {
         val b = board(
             idx(5, 7) to Gomoku.WHITE, idx(6, 7) to Gomoku.WHITE,
@@ -150,6 +161,23 @@ class GomokuTest {
             if (Gomoku.winningLine(board, move) != null) winner = toMove
             toMove = Gomoku.opponent(toMove)
         }
+        assertEquals(Gomoku.BLACK, winner)
+    }
+
+    @Test fun `hard beats easy in a full self-play game`() {
+        val random = Random(4321)
+        val board = Gomoku.emptyBoard().toMutableList()
+        var toMove = Gomoku.BLACK
+        var winner: Int? = null
+        val start = System.nanoTime()
+        while (winner == null && board.any { it == Gomoku.EMPTY }) {
+            val level = if (toMove == Gomoku.BLACK) GomokuDifficulty.HARD else GomokuDifficulty.EASY
+            val move = Gomoku.bestMove(board, toMove, level, random)
+            board[move] = toMove
+            if (Gomoku.winningLine(board, move) != null) winner = toMove
+            toMove = Gomoku.opponent(toMove)
+        }
+        println("hard-vs-easy game took ${(System.nanoTime() - start) / 1_000_000} ms, winner=${if (winner == Gomoku.BLACK) "hard" else "easy"}")
         assertEquals(Gomoku.BLACK, winner)
     }
 

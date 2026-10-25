@@ -4,16 +4,18 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,6 +34,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -65,6 +72,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.bzxandroidgames.sound.ButtonSound
+import com.example.bzxandroidgames.sound.LocalSoundController
+import com.example.bzxandroidgames.sound.SoundController
+import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.ui.theme.ShinkaiCountrysideBackdrop
 
 private object AboutInfo {
@@ -78,6 +89,7 @@ private object AboutInfo {
 
 private const val SECTION_ABOUT = 0
 private const val SECTION_THANKS = 1
+private const val SECTION_SOUND = 2
 
 /** Settings page sharing the summer lobby's backdrop and visual language. */
 @Composable
@@ -87,6 +99,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val sound = LocalSoundController.current
     val scroll = rememberScrollState()
     var entered by remember { mutableStateOf(false) }
     var section by rememberSaveable { mutableStateOf(SECTION_ABOUT) }
@@ -169,8 +182,10 @@ fun SettingsScreen(
                                     onEmail = { openOrCopy(Uri.parse("mailto:${AboutInfo.EMAIL}"), "已复制邮箱地址") },
                                     onGithub = { openOrCopy(Uri.parse(AboutInfo.GITHUB_URL), "已复制仓库链接") }
                                 )
-                            } else {
+                            } else if (current == SECTION_THANKS) {
                                 ThanksCard()
+                            } else {
+                                SoundCard(sound)
                             }
                         }
                     }
@@ -191,6 +206,7 @@ private fun SettingsSidebar(modifier: Modifier = Modifier, selected: Int, onSele
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SidebarEntry("关于", selected == SECTION_ABOUT, ::InfoMark, Modifier.fillMaxWidth()) { onSelect(SECTION_ABOUT) }
         SidebarEntry("致谢", selected == SECTION_THANKS, ::HeartMark, Modifier.fillMaxWidth()) { onSelect(SECTION_THANKS) }
+        SidebarEntry("音效", selected == SECTION_SOUND, ::SoundMark, Modifier.fillMaxWidth()) { onSelect(SECTION_SOUND) }
     }
 }
 
@@ -207,7 +223,7 @@ private fun SidebarEntry(
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) Color.White.copy(alpha = .82f) else Color.White.copy(alpha = .4f))
             .border(1.dp, if (selected) Color.White.copy(alpha = .95f) else Color.White.copy(alpha = .6f), RoundedCornerShape(16.dp))
-            .clickable(role = Role.Button, onClickLabel = title, onClick = onClick)
+            .clickSfx(role = Role.Button, onClickLabel = title, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -319,6 +335,145 @@ private fun ThanksCard() {
     }
 }
 
+/** Sound preferences: tap sounds (with a style dropdown) and a placeholder music switch. */
+@Composable
+private fun SoundCard(sound: SoundController?) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+            .shadow(12.dp, RoundedCornerShape(24.dp), clip = false, ambientColor = SeaGlass.copy(alpha = .13f), spotColor = SeaGlass.copy(alpha = .15f))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .8f), Color(0xFFF9FCF8).copy(alpha = .72f))))
+            .border(1.dp, Color.White.copy(alpha = .75f), RoundedCornerShape(24.dp))
+            .padding(horizontal = 20.dp, vertical = 18.dp)
+    ) {
+        Text("音效", color = DeepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "让每一次轻点，都有小小的回应。",
+            color = DeepInk.copy(alpha = .92f), fontSize = 13.sp, lineHeight = 22.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        SettingSwitchRow(
+            title = "按键音效",
+            caption = "按下按钮时，响起轻巧的一声",
+            checked = sound?.buttonSoundEnabled == true,
+            onCheckedChange = { sound?.enableButtonSound(it) }
+        )
+        AnimatedVisibility(
+            visible = sound?.buttonSoundEnabled == true,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            sound?.let { SoundTypePicker(it) }
+        }
+        Divider()
+        SettingSwitchRow(
+            title = "背景音乐",
+            caption = "静静的伴奏，正在筹备中",
+            checked = sound?.bgMusicEnabled == true,
+            onCheckedChange = { sound?.enableBgMusic(it) }
+        )
+    }
+}
+
+@Composable
+private fun SettingSwitchRow(
+    title: String,
+    caption: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickSfx(role = Role.Switch, onClickLabel = title) { onCheckedChange(!checked) }
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = DeepInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(2.dp))
+            Text(caption, color = SoftInk, fontSize = 11.sp)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = SeaGlass,
+                checkedThumbColor = Color.White,
+                checkedIconColor = SeaGlass,
+                uncheckedTrackColor = SoftInk.copy(alpha = .16f),
+                uncheckedThumbColor = Color.White,
+                uncheckedIconColor = SoftInk.copy(alpha = .35f),
+                uncheckedBorderColor = SoftInk.copy(alpha = .3f)
+            )
+        )
+    }
+}
+
+/** The tap-sound style dropdown; picking a type plays it once so it can be heard. */
+@Composable
+private fun SoundTypePicker(sound: SoundController) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("音效种类", color = SoftInk, fontSize = 12.sp, modifier = Modifier.widthIn(min = 76.dp))
+        Box {
+            Row(
+                Modifier.clip(RoundedCornerShape(12.dp))
+                    .background(SeaGlass.copy(alpha = .1f))
+                    .border(1.dp, SeaGlass.copy(alpha = .4f), RoundedCornerShape(12.dp))
+                    .clickSfx(onClickLabel = "选择音效种类") { menuOpen = true }
+                    .padding(horizontal = 13.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(sound.buttonSoundType.label, color = DeepInk, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.width(7.dp))
+                Text("▾", color = SeaGlass, fontSize = 11.sp)
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                containerColor = Color.White
+            ) {
+                ButtonSound.entries.forEach { type ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                type.label,
+                                color = if (type == sound.buttonSoundType) SeaGlass else DeepInk,
+                                fontWeight = if (type == sound.buttonSoundType) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                        },
+                        trailingIcon = {
+                            if (type == sound.buttonSoundType) Text("✓", color = SeaGlass, fontSize = 13.sp)
+                        },
+                        onClick = {
+                            sound.selectButtonSound(type)
+                            sound.play(type)
+                            menuOpen = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A single eighth note, matching the hairline style of the other sidebar marks. */
+@Composable
+private fun SoundMark(modifier: Modifier, tint: Color) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        drawOval(tint, topLeft = Offset(w * .16f, h * .68f), size = Size(w * .32f, h * .21f))
+        drawLine(tint, Offset(w * .46f, h * .76f), Offset(w * .46f, h * .17f), 1.5.dp.toPx(), StrokeCap.Round)
+        drawPath(
+            Path().apply {
+                moveTo(w * .46f, h * .17f)
+                quadraticTo(w * .82f, h * .26f, w * .68f, h * .5f)
+            },
+            tint, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
+}
+
 @Composable
 private fun InfoRow(
     label: String,
@@ -330,7 +485,7 @@ private fun InfoRow(
     val base = Modifier.fillMaxWidth()
     val row = if (onClick != null) {
         base.clip(RoundedCornerShape(12.dp))
-            .clickable(onClickLabel = onClickLabel) { onClick() }
+            .clickSfx(onClickLabel = onClickLabel) { onClick() }
             .padding(horizontal = 4.dp, vertical = 11.dp)
     } else base.padding(horizontal = 4.dp, vertical = 11.dp)
     Row(row, verticalAlignment = Alignment.CenterVertically) {

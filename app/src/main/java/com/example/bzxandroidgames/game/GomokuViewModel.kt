@@ -19,6 +19,8 @@ data class GomokuUiState(
     val mode: GomokuMode = GomokuMode.PVE,
     val difficulty: GomokuDifficulty = GomokuDifficulty.MEDIUM,
     val boardSkin: GomokuBoardSkin = GomokuBoardSkin.CLASSIC,
+    /** The human's stone color in PVE; the AI always takes the opposite side. */
+    val humanColor: Int = Gomoku.BLACK,
     val currentPlayer: Int = Gomoku.BLACK,
     val winner: Int? = null,
     val isDraw: Boolean = false,
@@ -39,7 +41,8 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
                 ?: GomokuMode.PVE,
             difficulty = GomokuDifficulty.entries.firstOrNull { it.name == preferences.getString("gomokuDifficulty", null) }
                 ?: GomokuDifficulty.MEDIUM,
-            boardSkin = GomokuBoardSkin.fromStorage(preferences.getString("gomokuBoardSkin", null))
+            boardSkin = GomokuBoardSkin.fromStorage(preferences.getString("gomokuBoardSkin", null)),
+            humanColor = if (preferences.getString("gomokuHumanColor", null) == "white") Gomoku.WHITE else Gomoku.BLACK
         )
     )
     val state: StateFlow<GomokuUiState> = _state.asStateFlow()
@@ -49,12 +52,12 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectMode(mode: GomokuMode) {
         preferences.edit { putString("gomokuMode", mode.name) }
-        if (_state.value.mode != mode) resetWith(mode, _state.value.difficulty)
+        if (_state.value.mode != mode) resetWith(mode, _state.value.difficulty, _state.value.humanColor)
     }
 
     fun selectDifficulty(difficulty: GomokuDifficulty) {
         preferences.edit { putString("gomokuDifficulty", difficulty.name) }
-        if (_state.value.difficulty != difficulty) resetWith(_state.value.mode, difficulty)
+        if (_state.value.difficulty != difficulty) resetWith(_state.value.mode, difficulty, _state.value.humanColor)
     }
 
     /** Skins are cosmetic: switching one keeps the current game untouched. */
@@ -63,27 +66,47 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
         _state.update { if (it.boardSkin != skin) it.copy(boardSkin = skin) else it }
     }
 
-    fun restart() = resetWith(_state.value.mode, _state.value.difficulty)
+    /**
+     * Switching sides is free before the first stone; once the game has started it
+     * restarts the board, and if the AI now holds black it opens immediately.
+     */
+    fun selectHumanColor(color: Int) {
+        preferences.edit { putString("gomokuHumanColor", if (color == Gomoku.WHITE) "white" else "black") }
+        val current = _state.value
+        if (current.humanColor == color) return
+        if (current.mode != GomokuMode.PVE) {
+            _state.update { it.copy(humanColor = color) }
+            return
+        }
+        if (current.moveCount == 0 && current.winner == null && !current.isDraw && !current.aiThinking) {
+            _state.update { it.copy(humanColor = color) }
+        } else {
+            resetWith(current.mode, current.difficulty, color)
+        }
+        maybeAiTurn()
+    }
+
+    fun restart() = resetWith(_state.value.mode, _state.value.difficulty, _state.value.humanColor)
 
     fun play(index: Int) {
         val current = _state.value
         if (current.winner != null || current.isDraw || current.aiThinking) return
         if (index !in 0 until Gomoku.CELL_COUNT || current.board[index] != Gomoku.EMPTY) return
-        if (current.mode == GomokuMode.PVE && current.currentPlayer != Gomoku.BLACK) return
+        if (current.mode == GomokuMode.PVE && current.currentPlayer != current.humanColor) return
         applyMove(index, current.currentPlayer)
         maybeAiTurn()
     }
 
-    /** In PVE one undo rewinds to the human's turn: drop the AI reply plus the human move,
-     *  or just the human's game-ending stone when it ended the game. */
+    /** In PVE one undo rewinds to the human's turn, whatever color each side holds. */
     fun undo() {
         val current = _state.value
         if (current.aiThinking || history.isEmpty()) return
-        val steps = when {
-            current.mode == GomokuMode.PVP -> 1
-            history.size % 2 == 0 -> 2
-            else -> 1
-        }
+        val steps = if (current.mode == GomokuMode.PVP) 1 else {
+            // after popping, history parity must leave the turn with the human:
+            // black moves on even counts (0-indexed parity), white on odd counts
+            val wantOdd = current.humanColor == Gomoku.WHITE
+            if (history.size % 2 == 0) { if (wantOdd) 1 else 2 } else { if (wantOdd) 2 else 1 }
+        }.coerceAtMost(history.size)
         repeat(steps) { history.removeAt(history.size - 1) }
         val board = Gomoku.emptyBoard().toMutableList()
         history.forEachIndexed { index, cell ->
@@ -104,6 +127,8 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
                 moveId = s.moveId + 1
             )
         }
+        // when the human plays white, undoing the AI's opening stone means the AI opens again
+        maybeAiTurn()
     }
 
     private fun applyMove(index: Int, player: Int) {
@@ -131,6 +156,8 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
     private fun maybeAiTurn() {
         val current = _state.value
         if (current.mode != GomokuMode.PVE || current.winner != null || current.isDraw) return
+        val ai = Gomoku.opponent(current.humanColor)
+        if (current.currentPlayer != ai || current.aiThinking) return
         val position = current.moveId
         _state.update { it.copy(aiThinking = true) }
         viewModelScope.launch {
@@ -138,29 +165,31 @@ class GomokuViewModel(application: Application) : AndroidViewModel(application) 
             val board = _state.value.board
             val difficulty = _state.value.difficulty
             val move = withContext(Dispatchers.Default) {
-                Gomoku.bestMove(board, Gomoku.WHITE, difficulty, random)
+                Gomoku.bestMove(board, ai, difficulty, random)
             }
-            // Drop the reply if the position changed (restart, undo or mode switch) meanwhile.
+            // Drop the reply if the position changed (restart, undo or side switch) meanwhile.
             val now = _state.value
             if (now.aiThinking && now.winner == null && !now.isDraw &&
-                now.currentPlayer == Gomoku.WHITE && now.moveId == position && now.board == board
+                now.currentPlayer == ai && now.moveId == position && now.board == board
             ) {
-                applyMove(move, Gomoku.WHITE)
+                applyMove(move, ai)
             } else if (now.moveId == position && now.aiThinking) {
                 _state.update { it.copy(aiThinking = false) }
             }
         }
     }
 
-    private fun resetWith(mode: GomokuMode, difficulty: GomokuDifficulty) {
+    private fun resetWith(mode: GomokuMode, difficulty: GomokuDifficulty, humanColor: Int) {
         history.clear()
         _state.update {
             GomokuUiState(
                 mode = mode,
                 difficulty = difficulty,
                 boardSkin = it.boardSkin,
+                humanColor = humanColor,
                 moveId = it.moveId + 1
             )
         }
+        maybeAiTurn()
     }
 }

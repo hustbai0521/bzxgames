@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.bzxandroidgames.sound.clickSfx
 import kotlin.math.sin
 
 /** Both the label and preview belong to a single accessible radio-button target. */
@@ -67,7 +68,7 @@ fun ThemePicker(
                     .selectable(
                         selected = isSelected,
                         role = Role.RadioButton,
-                        onClick = { onSelect(theme) }
+                        onClick = clickSfx { onSelect(theme) }
                     )
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.ui.theme.ShinkaiCountrysideBackdrop
 
 /** A fixed summer lobby, independent of the themes used inside the individual games. */
@@ -45,6 +46,7 @@ fun GameLibrary(
     on2048: () -> Unit,
     onGomoku: () -> Unit,
     onMinesweeper: () -> Unit = {},
+    onSpider: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSkyVisibleChange: (Boolean) -> Unit = {}
 ) {
@@ -127,21 +129,25 @@ fun GameLibrary(
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("下一站，小惊喜", color = DeepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("4 款筹备中", color = SoftInk, fontSize = 10.sp)
+                    Text("3 款筹备中", color = SoftInk, fontSize = 10.sp)
                 }
                 val games = listOf(
                     UpcomingGame("贪吃蛇", "一路生长", 0),
                     UpcomingGame("俄罗斯方块", "拼出新可能", 1),
                     UpcomingGame("连连看", "遇见成双的美好", 2),
-                    UpcomingGame("蜘蛛纸牌", "静享一局好牌", 3),
-                    UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true)
+                    UpcomingGame("蜘蛛纸牌", "理好每一手牌", 3, ready = true, route = "spider"),
+                    UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true, route = "mines")
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     games.chunked(2).forEach { pair ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             pair.forEach { game ->
                                 UpcomingCard(game, Modifier.weight(1f)) {
-                                    if (game.ready) onMinesweeper() else upcoming = game.name
+                                    when (game.route) {
+                                        "mines" -> onMinesweeper()
+                                        "spider" -> onSpider()
+                                        else -> upcoming = game.name
+                                    }
                                 }
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
@@ -160,7 +166,7 @@ fun GameLibrary(
             containerColor = Color(0xFFF5FAF7),
             title = { Text("美好正在路上", color = DeepInk, fontWeight = FontWeight.SemiBold) },
             text = { Text("$name 正在筹备中，先享受眼前这一局吧。", color = SoftInk) },
-            confirmButton = { TextButton(onClick = { upcoming = null }) { Text("好，慢慢来", color = SeaGlass) } }
+            confirmButton = { TextButton(onClick = clickSfx { upcoming = null }) { Text("好，慢慢来", color = SeaGlass) } }
         )
     }
 }
@@ -175,7 +181,7 @@ private fun PlayableCard(
         modifier.fillMaxHeight().shadow(12.dp, shape, clip = false, ambientColor = accent.copy(alpha = .13f), spotColor = accent.copy(alpha = .15f))
             .clip(shape).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFF9FCF8).copy(alpha = .93f))))
             .border(1.dp, Color.White.copy(alpha = .9f), shape)
-            .clickable(role = Role.Button, onClickLabel = "进入$title", onClick = onClick).padding(16.dp),
+            .clickSfx(role = Role.Button, onClickLabel = "进入$title", onClick = onClick).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Text(category, color = accent, fontSize = 10.sp, letterSpacing = 1.sp)
@@ -236,7 +242,13 @@ private fun GomokuIllustration(modifier: Modifier) {
     }
 }
 
-private data class UpcomingGame(val name: String, val subtitle: String, val icon: Int, val ready: Boolean = false)
+private data class UpcomingGame(
+    val name: String,
+    val subtitle: String,
+    val icon: Int,
+    val ready: Boolean = false,
+    val route: String? = null
+)
 
 @Composable
 private fun UpcomingCard(game: UpcomingGame, modifier: Modifier, onClick: () -> Unit) {
@@ -249,7 +261,7 @@ private fun UpcomingCard(game: UpcomingGame, modifier: Modifier, onClick: () -> 
                 if (game.ready) SeaGlass.copy(alpha = .45f) else Color.White.copy(alpha = .85f),
                 RoundedCornerShape(17.dp)
             )
-            .clickable(
+            .clickSfx(
                 role = Role.Button,
                 onClickLabel = if (game.ready) "进入${game.name}" else "${game.name}，敬请期待",
                 onClick = onClick
