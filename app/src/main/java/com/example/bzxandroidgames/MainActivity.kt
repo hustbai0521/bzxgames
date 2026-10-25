@@ -103,12 +103,14 @@ import com.example.bzxandroidgames.game.GomokuViewModel
 import com.example.bzxandroidgames.game.MinesweeperViewModel
 import com.example.bzxandroidgames.game.MoveResult
 import com.example.bzxandroidgames.game.SpiderViewModel
+import com.example.bzxandroidgames.game.TetrisViewModel
 import com.example.bzxandroidgames.sound.LocalSoundController
 import com.example.bzxandroidgames.sound.SoundController
 import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.ui.GomokuScreen
 import com.example.bzxandroidgames.ui.MinesweeperScreen
 import com.example.bzxandroidgames.ui.SpiderScreen
+import com.example.bzxandroidgames.ui.TetrisScreen
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -122,11 +124,13 @@ class MainActivity : ComponentActivity() {
             val gomoku: GomokuViewModel = viewModel()
             val mines: MinesweeperViewModel = viewModel()
             val spider: SpiderViewModel = viewModel()
+            val tetris: TetrisViewModel = viewModel()
             val theme by game.theme.collectAsStateWithLifecycle()
             val state by game.state.collectAsStateWithLifecycle()
             val gomokuState by gomoku.state.collectAsStateWithLifecycle()
             val minesState by mines.state.collectAsStateWithLifecycle()
             val spiderState by spider.state.collectAsStateWithLifecycle()
+            val tetrisState by tetris.state.collectAsStateWithLifecycle()
             val sound = remember { SoundController(applicationContext) }
             CompositionLocalProvider(LocalSoundController provides sound) {
                 BzxAndroidGamesTheme(theme) {
@@ -168,6 +172,7 @@ class MainActivity : ComponentActivity() {
                             currentGame == "gomoku" -> "gomoku"
                             currentGame == "mines" -> "mines"
                             currentGame == "spider" -> "spider"
+                            currentGame == "tetris" -> "tetris"
                             currentGame == "settings" -> "settings"
                             else -> "library"
                         },
@@ -219,6 +224,20 @@ class MainActivity : ComponentActivity() {
                             onSelectSuits = spider::setSuits,
                             onClearHint = spider::clearHint
                         )
+                    } else if (screen == "tetris") {
+                        TetrisScreen(
+                            state = tetrisState,
+                            onBack = { currentGame = null },
+                            onMoveLeft = tetris::moveLeft,
+                            onMoveRight = tetris::moveRight,
+                            onRotate = tetris::rotate,
+                            onSoftDrop = tetris::softDrop,
+                            onHardDrop = tetris::hardDrop,
+                            onTick = tetris::tick,
+                            onPause = tetris::autoPause,
+                            onResume = tetris::resume,
+                            onRestart = tetris::restart
+                        )
                     } else if (screen == "settings") {
                         com.example.bzxandroidgames.ui.SettingsScreen(
                             onBack = { currentGame = null },
@@ -230,6 +249,7 @@ class MainActivity : ComponentActivity() {
                             onGomoku = { currentGame = "gomoku" },
                             onMinesweeper = { currentGame = "mines" },
                             onSpider = { currentGame = "spider" },
+                            onTetris = { currentGame = "tetris" },
                             onSettings = { currentGame = "settings" },
                             onSkyVisibleChange = { librarySkyVisible = it }
                         )

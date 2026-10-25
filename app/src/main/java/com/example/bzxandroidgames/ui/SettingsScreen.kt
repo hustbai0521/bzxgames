@@ -87,9 +87,12 @@ private object AboutInfo {
     const val GITHUB_LABEL = "github.com/hustbai0521/bzxgames"
 }
 
-private const val SECTION_ABOUT = 0
-private const val SECTION_THANKS = 1
-private const val SECTION_SOUND = 2
+// Sidebar order contract (user-requested, DO NOT reshuffle): FEATURE entries come first,
+// 关于 and 致谢 are the "about this app" block and ALWAYS stay pinned at the bottom.
+// Add any new settings section above SECTION_ABOUT and renumber accordingly.
+private const val SECTION_SOUND = 0
+private const val SECTION_ABOUT = 1
+private const val SECTION_THANKS = 2
 
 /** Settings page sharing the summer lobby's backdrop and visual language. */
 @Composable
@@ -102,7 +105,7 @@ fun SettingsScreen(
     val sound = LocalSoundController.current
     val scroll = rememberScrollState()
     var entered by remember { mutableStateOf(false) }
-    var section by rememberSaveable { mutableStateOf(SECTION_ABOUT) }
+    var section by rememberSaveable { mutableStateOf(SECTION_SOUND) }
     val reveal = animateFloatAsState(if (entered) 1f else 0f, tween(900), label = "settings-arrival")
     LaunchedEffect(Unit) { entered = true }
 
@@ -200,13 +203,17 @@ fun SettingsScreen(
     }
 }
 
-/** Left sidebar with entries listed like a classic settings page; translucent like the cards. */
+/**
+ * Left sidebar with entries listed like a classic settings page; translucent like the cards.
+ * ORDER CONTRACT (user-requested): feature entries on top, 关于/致谢 pinned LAST —
+ * keep new entries above the 关于 row; never move 关于/致谢 up.
+ */
 @Composable
 private fun SettingsSidebar(modifier: Modifier = Modifier, selected: Int, onSelect: (Int) -> Unit) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SidebarEntry("音效", selected == SECTION_SOUND, ::SoundMark, Modifier.fillMaxWidth()) { onSelect(SECTION_SOUND) }
         SidebarEntry("关于", selected == SECTION_ABOUT, ::InfoMark, Modifier.fillMaxWidth()) { onSelect(SECTION_ABOUT) }
         SidebarEntry("致谢", selected == SECTION_THANKS, ::HeartMark, Modifier.fillMaxWidth()) { onSelect(SECTION_THANKS) }
-        SidebarEntry("音效", selected == SECTION_SOUND, ::SoundMark, Modifier.fillMaxWidth()) { onSelect(SECTION_SOUND) }
     }
 }
 

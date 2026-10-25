@@ -47,6 +47,7 @@ fun GameLibrary(
     onGomoku: () -> Unit,
     onMinesweeper: () -> Unit = {},
     onSpider: () -> Unit = {},
+    onTetris: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSkyVisibleChange: (Boolean) -> Unit = {}
 ) {
@@ -129,11 +130,11 @@ fun GameLibrary(
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("下一站，小惊喜", color = DeepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("3 款筹备中", color = SoftInk, fontSize = 10.sp)
+                    Text("2 款筹备中", color = SoftInk, fontSize = 10.sp)
                 }
                 val games = listOf(
                     UpcomingGame("贪吃蛇", "一路生长", 0),
-                    UpcomingGame("俄罗斯方块", "拼出新可能", 1),
+                    UpcomingGame("俄罗斯方块", "拼出新可能", 1, ready = true, route = "tetris"),
                     UpcomingGame("连连看", "遇见成双的美好", 2),
                     UpcomingGame("蜘蛛纸牌", "理好每一手牌", 3, ready = true, route = "spider"),
                     UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true, route = "mines")
@@ -146,6 +147,7 @@ fun GameLibrary(
                                     when (game.route) {
                                         "mines" -> onMinesweeper()
                                         "spider" -> onSpider()
+                                        "tetris" -> onTetris()
                                         else -> upcoming = game.name
                                     }
                                 }
