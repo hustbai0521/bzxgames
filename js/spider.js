@@ -350,8 +350,7 @@
       if (blocked) {
         BZX.toast(root, "有空列时不能发牌，先把牌填回去");
       } else if (doDeal()) {
-        renderAll();
-        playDealAnimation();
+        playDealAnimation(); // 内部首帧就把新牌隐藏，避免落地前先闪一次
       }
     });
 
@@ -401,7 +400,7 @@
       const node = el("div", "spider-card");
       node.style.width = cardWidth + "px";
       node.style.height = cardWidth * 1.4 + "px";
-      if (opts.fresh) node.classList.add("deal-pop");
+      // 新牌的弹跳动画由发牌流程统一控制（落地时加一次），这里不再自动加，避免重渲染时反复闪
       if (opts.selected) node.classList.add("selected-run");
       if (opts.hinted) node.classList.add("hinted");
       if (opts.lifted) node.classList.add("drag-lifted");
@@ -477,11 +476,15 @@
           });
           if (isLifted) node.style.pointerEvents = "none";
           if (showTargetGlow && row === cards.length - 1) node.classList.add("target-glow");
-          // 发牌动画进行中：尚未落地的新牌先隐藏，等飞行牌到位再现身
-          if (dealing && freshDeal && row === cards.length - 1) {
-            if (column >= dealing.landed) {
-              node.classList.remove("deal-pop");
-              node.classList.add("dealing-hidden");
+          // 新牌弹跳只播一次：
+          // 动画中未落地的 → 隐藏等飞行牌；已落地的 → 落地回调已弹过，不再加类；
+          // 动画结束后 → 该序号的弹跳已播过，重渲染不再闪
+          const isNewlyDealt = freshDeal && row === cards.length - 1 && !isLifted;
+          if (isNewlyDealt) {
+            if (dealing) {
+              if (column >= dealing.landed) node.classList.add("dealing-hidden");
+            } else if (state.game.serial !== dealtPopSerial) {
+              node.classList.add("deal-pop");
             }
           }
           node.style.top = y + "px";
@@ -567,7 +570,8 @@
 
     function playDealAnimation() {
       dealing = { landed: 0 };
-      renderBoard(); // 新牌先隐藏，等飞行牌到位
+      renderBoard(); // 新牌先隐藏，等飞行牌到位（此时不弹跳）
+      renderTopbar(); // 发牌使 canUndo 变化，同步顶栏按钮
       const stockRect = stockPile.getBoundingClientRect();
       for (let col = 0; col < COLUMN_COUNT; col++) {
         let fly = null; // 本列的飞行牌，落地时移除
@@ -606,7 +610,11 @@
           }
           if (col === COLUMN_COUNT - 1) {
             setTimeout(() => {
-              if (dealing) { dealing = null; renderBoard(); }
+              if (dealing) {
+                dealing = null;
+                dealtPopSerial = state.game.serial; // 本局新牌已弹过，后续重渲染不再闪
+                renderBoard();
+              }
             }, 200);
           }
         }, col * DEAL_STAGGER + DEAL_FLIGHT + 60);
@@ -618,6 +626,7 @@
     let dragSession = null; // { from,index,cards,originX,originY,ghost[],moved }
     let hoverTarget = null;
     let dealing = null; // 发牌动画进行中：{ landed: 已落地列数 }
+    let dealtPopSerial = -1; // 已播过落地弹跳的牌局序号（防止重渲染时反复闪烁）
 
     function attachDrag(node, column, row) {
       node.addEventListener("pointerdown", (e) => {
