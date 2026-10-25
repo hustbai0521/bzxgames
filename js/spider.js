@@ -554,20 +554,41 @@
         if (state.game.status === "WON") return;
         if (e.button !== 0 && e.pointerType === "mouse") return;
         if (!movableRun(state.game.columns[column], row)) return;
+        // 上一次会话若未正常收尾（如在窗外松开鼠标、第二根手指按下），先清掉残影
+        if (dragSession) {
+          dragSession.ghosts.forEach((g) => g.node.remove());
+          dragSession = null;
+          hoverTarget = null;
+        }
         const cards = state.game.columns[column].slice(row);
         dragSession = {
           from: column, index: row, cards,
           startX: e.clientX, startY: e.clientY,
           dx: 0, dy: 0, moved: false, ghosts: [],
+          pointerId: e.pointerId,
         };
         e.preventDefault();
       });
+    }
+
+    // 异常收尾：窗口失焦/切走标签页时，视作松手
+    function endDragAbruptly() {
+      if (!dragSession) return;
+      dragSession.ghosts.forEach((g) => g.node.remove());
+      dragSession = null;
+      hoverTarget = null;
+      clearSelection();
+      renderBoard();
     }
 
     // 全局 move/up：真正执行拖动
     document.addEventListener("pointermove", onPointerMove);
     document.addEventListener("pointerup", onPointerUp);
     document.addEventListener("pointercancel", onPointerUp);
+    // 兜底：窗口失焦/切走标签页时 pointerup 可能丢失，强制收尾防残影
+    window.addEventListener("blur", endDragAbruptly);
+    const onVisChange = () => { if (document.hidden) endDragAbruptly(); };
+    document.addEventListener("visibilitychange", onVisChange);
 
     function onPointerMove(e) {
       if (!dragSession) return;
@@ -601,6 +622,8 @@
     }
 
     function liftGhosts(e) {
+      // 捕获指针：之后即使鼠标在窗口外松开，pointerup 也会照常送达
+      try { board.setPointerCapture(e.pointerId); } catch (err) { /* 已释放等 */ }
       // 从各列节点里取被抬起卡片的位置，创建浮动副本
       const boardRect = board.getBoundingClientRect();
       const colEl = colEls[dragSession.from];
@@ -625,8 +648,9 @@
       });
     }
 
-    function onPointerUp() {
+    function onPointerUp(e) {
       if (!dragSession) return;
+      try { if (e && e.pointerId !== undefined) board.releasePointerCapture(e.pointerId); } catch (err) { /* 未捕获 */ }
       const session = dragSession;
       dragSession = null;
       session.ghosts.forEach((g) => g.node.remove());
@@ -853,8 +877,14 @@
     renderAll();
 
     return () => {
+      // 离开屏幕时若还有拖拽会话/残影，全部清掉
+      document.querySelectorAll(".drag-ghost").forEach((n) => n.remove());
+      dragSession = null;
+      hoverTarget = null;
       stopVignette();
       ro.disconnect();
+      window.removeEventListener("blur", endDragAbruptly);
+      document.removeEventListener("visibilitychange", onVisChange);
       document.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("pointerup", onPointerUp);
       document.removeEventListener("pointercancel", onPointerUp);
