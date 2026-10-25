@@ -1,0 +1,275 @@
+/* ============================================================
+   base.css — reset, shared chrome (buttons, pills, dialogs,
+   headers, score cards, overlays) shared by every screen.
+   Compose dp/sp are mapped 1:1 to CSS px.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #071323;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", "Microsoft YaHei", "PingFang SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app { position: fixed; inset: 0; overflow: hidden; }
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible { outline: 2px solid rgba(120, 170, 255, .7); outline-offset: 2px; }
+
+/* ---------- screen container & transitions (AnimatedContent) ---------- */
+
+.screen-host { position: absolute; inset: 0; }
+
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.screen.entering { animation: screen-in 550ms cubic-bezier(.2, 0, 0, 1) both; }
+.screen.exiting  { animation: screen-out 380ms cubic-bezier(.2, 0, 0, 1) both; pointer-events: none; }
+@keyframes screen-in  { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes screen-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.06); } }
+
+/* The portrait column every phone-style screen shares (widthIn(max = 480.dp)) */
+.portrait-col {
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px;
+}
+
+/* ---------- shared text buttons / pills ---------- */
+
+.back-btn {
+  align-self: flex-start;
+  padding: 10px 8px 10px 0;
+  font-size: 14px;
+  letter-spacing: 0;
+  opacity: .95;
+  transition: opacity .15s;
+}
+.back-btn:hover { opacity: .7; }
+
+.overlay-pill {
+  display: inline-block;
+  padding: 9px 20px;
+  border-radius: 50px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter .15s, transform .1s;
+  user-select: none;
+}
+.overlay-pill:hover { filter: brightness(1.08); }
+.overlay-pill:active { transform: scale(.97); }
+.overlay-pill.filled { font-weight: 700; }
+
+/* ---------- round icon actions (RoundAction / HoldButton) ---------- */
+
+.round-action {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+  font-weight: 500;
+  flex: 0 0 auto;
+  user-select: none;
+  cursor: pointer;
+  transition: filter .15s, transform .1s;
+}
+.round-action:hover { filter: brightness(1.2); }
+.round-action:active { transform: scale(.94); }
+.round-action:disabled { cursor: default; filter: none; }
+.round-action:disabled:active { transform: none; }
+
+.hold-btn { width: 52px; height: 52px; font-size: 22px; }
+.snake-key { width: 56px; height: 56px; font-size: 22px; }
+
+/* ---------- score cards ---------- */
+
+.score-card {
+  flex: 1;
+  border-radius: 18px;
+  padding: 13px 18px;
+  min-width: 0;
+}
+.score-card .sc-label {
+  font-size: 9px;
+  letter-spacing: 1.7px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.score-card .sc-value {
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.score-card.sc-anim .sc-value { animation: score-bump 260ms cubic-bezier(.2, 0, 0, 1); }
+@keyframes score-bump { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- hint pill ---------- */
+
+.hint-pill {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 50px;
+  padding: 8px 15px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.hint-pill::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+
+/* ---------- gradient-brush titles ---------- */
+
+.brush-title {
+  font-weight: 900;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  width: fit-content;
+}
+
+/* ---------- Material-style dialog ---------- */
+
+.dialog-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  animation: dialog-in 180ms ease-out both;
+  padding: 24px;
+}
+@keyframes dialog-in { from { opacity: 0; } to { opacity: 1; } }
+
+.dialog {
+  width: 100%;
+  max-width: 340px;
+  border-radius: 28px;
+  padding: 24px;
+  animation: dialog-pop 200ms cubic-bezier(.2, 0, 0, 1) both;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+}
+@keyframes dialog-pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+
+.dialog h3 { font-size: 22px; font-weight: 900; line-height: 1.3; margin-bottom: 12px; }
+.dialog .dialog-body { font-size: 14px; line-height: 1.55; margin-bottom: 22px; }
+.dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.dialog-btn-filled {
+  padding: 9px 17px;
+  border-radius: 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  transition: filter .15s, transform .1s;
+}
+.dialog-btn-filled:hover { filter: brightness(1.1); }
+.dialog-btn-filled:active { transform: scale(.97); }
+.dialog-btn-text {
+  padding: 9px 13px;
+  border-radius: 22px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background .15s;
+}
+.dialog-btn-text:hover { background: rgba(127, 127, 127, .12); }
+
+/* wide variant used by the board shop */
+.dialog.wide { max-width: 400px; }
+
+/* ---------- toast (Android Toast equivalent) ---------- */
+
+.app-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  background: rgba(40, 44, 52, .94);
+  color: #fff;
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 50px;
+  z-index: 90;
+  white-space: nowrap;
+  animation: toast-in 200ms ease-out both, toast-out 200ms ease-in forwards;
+  animation-delay: 0ms, var(--toast-life, 2000ms);
+  pointer-events: none;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toast-out { to { opacity: 0; } }
+
+/* ---------- pause / start overlays ---------- */
+
+.center-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+.center-overlay .ov-card {
+  border-radius: 24px;
+  padding: 24px 28px;
+  text-align: center;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, .3);
+  animation: dialog-pop 220ms cubic-bezier(.2, 0, 0, 1) both;
+}
+.center-overlay .ov-title { font-size: 22px; font-weight: 900; margin-bottom: 6px; }
+.center-overlay .ov-sub { font-size: 12px; margin-bottom: 16px; }
+.center-overlay .ov-row { display: flex; gap: 10px; justify-content: center; }
+
+/* ---------- scrollable content column (lobby / settings / gomoku / mines) ---------- */
+
+.scroll-col {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 140, 140, .35) transparent;
+}
+/* 对应安卓 verticalScroll：内容超高时整列滚动，子项不许被 flex 压缩 */
+.scroll-col > * { flex-shrink: 0; }
+.scroll-col::-webkit-scrollbar { width: 6px; }
+.scroll-col::-webkit-scrollbar-thumb { background: rgba(120, 140, 140, .3); border-radius: 3px; }
+
+.reveal-block { animation: lobby-reveal 900ms cubic-bezier(.2, 0, 0, 1) both; }
+@keyframes lobby-reveal { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.reveal-block.reveal-sm { animation-name: lobby-reveal-sm; }
+@keyframes lobby-reveal-sm { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- small canvas helper ---------- */
+canvas { display: block; }
