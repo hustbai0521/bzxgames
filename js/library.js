@@ -87,10 +87,17 @@
     const grid = el("div", "upcoming-grid");
     for (let i = 0; i < games.length; i += 2) {
       const row = el("div", "upcoming-row");
-      games.slice(i, i + 2).forEach((g) => {
-        row.appendChild(upcomingCard(g));
+      const pair = games.slice(i, i + 2);
+      pair.forEach((g) => {
+        const cardEl = upcomingCard(g);
+        if (pair.length === 1) {
+          // Chrome 对 button 弹性项的固有尺寸计算会让"单卡+占位"分宽不均，
+          // 这里固定半行宽（扣除间距的一半），与成对行严格一致
+          cardEl.style.flex = "0 0 calc(50% - 5px)";
+        }
+        row.appendChild(cardEl);
       });
-      if (games.slice(i, i + 2).length === 1) {
+      if (pair.length === 1) {
         const filler = el("div");
         filler.style.flex = "1";
         row.appendChild(filler);
