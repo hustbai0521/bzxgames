@@ -712,6 +712,10 @@
         ghost.style.left = rect.left + "px";
         ghost.style.top = rect.top + i * upGap + "px";
         ghost.style.zIndex = 80 + i;
+        // 内联白底：body 上拿不到 .spider 的 CSS 变量，旧缓存 CSS 也影响不到这里
+        ghost.style.background = "#fff";
+        ghost.style.border = "1px solid #9AA0A6";
+        ghost.style.opacity = "1";
         document.body.appendChild(ghost);
         dragSession.ghosts.push({ node: ghost, originLeft: rect.left, originTop: rect.top + i * upGap });
         src.style.visibility = "hidden";
