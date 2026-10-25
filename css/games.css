@@ -508,7 +508,14 @@
 /* 发牌动画：飞行中的牌背与未落地的新牌 */
 .spider-card.deal-fly { will-change: left, top, transform; z-index: 70; pointer-events: none; }
 .spider-card.dealing-hidden { visibility: hidden; pointer-events: none; }
-.spider-card.drag-ghost { pointer-events: none; z-index: 50; box-shadow: 0 12px 24px rgba(0,0,0,.45); }
+.spider-card.drag-ghost {
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .45);
+  /* 幽灵牌挂在 body 上拿不到 .spider 的 CSS 变量，必须用字面量颜色 */
+  background: #fff;
+  border: 1px solid #9aa0a6;
+}
 .spider-card-face { position: absolute; inset: 0; overflow: hidden; }
 .spider-empty-col { position: absolute; border: 1px solid rgba(255,255,255,.3); border-radius: 3px; }
 .spider-empty-col.target-glow { border-color: var(--hint-green); box-shadow: 0 0 8px rgba(182,255,201,.5); }
