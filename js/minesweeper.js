@@ -15,9 +15,9 @@
   const NUMBER_COLORS = ["#1D1DE8", "#0E7E12", "#E01B1B", "#101A8C", "#7E1010", "#0E7E7E", "#000000", "#6E6E6E"];
 
   const LEVELS = {
-    EASY: { title: "简单", rows: 10, cols: 8, mines: 10 },
-    MEDIUM: { title: "中等", rows: 16, cols: 12, mines: 30 },
-    HARD: { title: "困难", rows: 20, cols: 15, mines: 50 },
+    EASY: { title: "简单", rows: 9, cols: 9, mines: 10 },
+    MEDIUM: { title: "中等", rows: 16, cols: 16, mines: 40 },
+    HARD: { title: "困难", rows: 16, cols: 30, mines: 99 },
   };
 
   /* ---------------- engine (Minesweeper.kt) ---------------- */
@@ -333,16 +333,20 @@
     }
 
     function computeCellSize() {
-      // 宽屏时列会放宽到 560px，格子按可用宽度与高度取小
-      const maxW = Math.min(window.innerWidth - 36, 524);
-      const maxH = window.innerHeight - 350;
-      const byW = (maxW - 12) / state.level.cols;
-      const byH = Math.max(13, maxH) / state.level.rows;
-      cellPx = Math.max(13, Math.floor(Math.min(byW, byH)));
+      // 经典尺寸（初级 9×9 / 中级 16×16 / 高级 16×30·99 雷）在大屏上要尽量放大格子；
+      // 窄屏时格子缩到最小 12px，棋盘随 scroll-col 滚动
+      const availW = Math.min(window.innerWidth - 72, 1480);
+      const availH = window.innerHeight - 330;
+      const byW = (availW - 12) / state.level.cols;
+      const byH = Math.max(12, availH) / state.level.rows;
+      cellPx = Math.max(12, Math.min(36, Math.floor(Math.min(byW, byH))));
     }
 
     function renderBoard() {
       computeCellSize();
+      // LED 状态栏与棋盘同宽（经典 Win98 布局）
+      statusPanel.style.width = (state.level.cols * cellPx + 8) + "px";
+      statusPanel.style.alignSelf = "center";
       BZX.clear(boardInner);
       cellEls = [];
       for (let row = 0; row < state.level.rows; row++) {

@@ -585,6 +585,13 @@
   .score-card { padding: 15px 20px; }
   .score-card .sc-value { font-size: 26px; }
 
+  /* 扫雷：经典大棋盘需要整屏宽度（高级 16×30） */
+  .mines .portrait-col {
+    max-width: none;
+    width: min(100%, 1560px);
+    padding: 14px 28px 0 !important;
+  }
+
   /* 五子棋：左信息面板 + 右大棋盘 */
   .gomoku-col {
     max-width: 1120px;

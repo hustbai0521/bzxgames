@@ -138,37 +138,6 @@
     );
   }
 
-  function hint(game) {
-    let best = null;
-    function consider(candidate) {
-      if (best === null || candidate.rank > best.rank) best = candidate;
-    }
-    for (let from = 0; from < COLUMN_COUNT; from++) {
-      const column = game.columns[from];
-      let index = column.findIndex((c) => c.faceUp);
-      if (index === -1) continue;
-      while (index < column.length) {
-        if (movableRun(column, index)) {
-          const run = column.slice(index);
-          for (let to = 0; to < COLUMN_COUNT; to++) {
-            if (to === from) continue;
-            const target = game.columns[to];
-            if (!canDrop(run, target)) continue;
-            let rank = run.length;
-            if (target.length && target[target.length - 1].suit === run[0].suit) rank += 4;
-            if (index > 0 && !column[index - 1].faceUp) rank += 2;
-            if (target.length) rank += 1;
-            if (target.length === 0 && index === 0) rank -= 5;
-            consider({ from, index, to, rank });
-          }
-        }
-        index++;
-      }
-    }
-    if (best === null) return { from: 0, index: 0, to: 0, suggestDeal: true };
-    return { from: best.from, index: best.index, to: best.to, suggestDeal: false };
-  }
-
   /* ---------------- state (SpiderViewModel.kt) ---------------- */
 
   const state = {
@@ -176,8 +145,6 @@
     selectedFrom: null,
     selectedIndex: null,
     canUndo: false,
-    hint: null,
-    hintSerial: 0,
   };
   const history = [];
 
@@ -191,7 +158,7 @@
       const moved = move(game, heldFrom, state.selectedIndex, column);
       if (moved) {
         pushHistory();
-        Object.assign(state, { game: moved, selectedFrom: null, selectedIndex: null, canUndo: true, hint: null });
+        Object.assign(state, { game: moved, selectedFrom: null, selectedIndex: null, canUndo: true });
         return true;
       }
     }
@@ -238,7 +205,7 @@
     const moved = move(state.game, from, index, to);
     if (moved) {
       pushHistory();
-      Object.assign(state, { game: moved, selectedFrom: null, selectedIndex: null, canUndo: true, hint: null });
+      Object.assign(state, { game: moved, selectedFrom: null, selectedIndex: null, canUndo: true });
       return true;
     }
     clearSelection();
@@ -249,7 +216,7 @@
     const dealt = deal(state.game);
     if (!dealt) return false;
     pushHistory();
-    Object.assign(state, { game: dealt, selectedFrom: null, selectedIndex: null, canUndo: true, hint: null });
+    Object.assign(state, { game: dealt, selectedFrom: null, selectedIndex: null, canUndo: true });
     return true;
   }
 
@@ -261,13 +228,13 @@
       score: 500 - (previous.moves + 1) + 100 * previous.completed.length,
       serial: state.game.serial + 1,
     });
-    Object.assign(state, { game, selectedFrom: null, selectedIndex: null, canUndo: history.length > 0, hint: null });
+    Object.assign(state, { game, selectedFrom: null, selectedIndex: null, canUndo: history.length > 0 });
   }
 
   function restart() { startNewGame(state.game.suits); }
   function startNewGame(suits) {
     history.length = 0;
-    Object.assign(state, { game: newGame(suits), selectedFrom: null, selectedIndex: null, canUndo: false, hint: null });
+    Object.assign(state, { game: newGame(suits), selectedFrom: null, selectedIndex: null, canUndo: false });
   }
 
   /* ---------------- screen ---------------- */
@@ -294,6 +261,8 @@
     Object.keys(SUITS).forEach((key) => {
       const pill = el("button", "felt-pill" + (state.game.suits === key ? " selected" : ""), SUITS[key].title);
       BZX.sfxButton(pill, () => {
+        if (dealing) return;
+        endDragAbruptly(); // 拖拽中切换花色：先收尾会话防残影
         BZX.store.set("spiderSuits", key);
         startNewGame(key);
         renderAll();
@@ -305,20 +274,10 @@
     topbar.appendChild(spring2);
     const restartPill = el("button", "felt-pill", "新游戏 ↻");
     const undoPill = el("button", "felt-pill", "撤销 ↶");
-    const hintPill = el("button", "felt-pill", "提示");
-    BZX.sfxButton(restartPill, () => { restart(); renderAll(); });
-    BZX.sfxButton(undoPill, () => { undo(); renderAll(); });
-    BZX.sfxButton(hintPill, () => {
-      state.hint = hint(state.game);
-      state.hintSerial++;
-      renderBoard();
-      setTimeout(() => {
-        if (state.hint) { state.hint = null; renderBoard(); }
-      }, 2000);
-    });
+    BZX.sfxButton(restartPill, () => { if (dealing) return; endDragAbruptly(); restart(); renderAll(); });
+    BZX.sfxButton(undoPill, () => { if (dealing) return; endDragAbruptly(); undo(); renderAll(); });
     topbar.appendChild(restartPill);
     topbar.appendChild(undoPill);
-    topbar.appendChild(hintPill);
     col.appendChild(topbar);
 
     /* board */
@@ -402,7 +361,6 @@
       node.style.height = cardWidth * 1.4 + "px";
       // 新牌的弹跳动画由发牌流程统一控制（落地时加一次），这里不再自动加，避免重渲染时反复闪
       if (opts.selected) node.classList.add("selected-run");
-      if (opts.hinted) node.classList.add("hinted");
       if (opts.lifted) node.classList.add("drag-lifted");
       node.innerHTML = cardFaceHTML(card);
       if (opts.interactive) {
@@ -432,7 +390,6 @@
       const downGap = cardHeight * 0.13;
       const upGap = cardHeight * 0.27;
       const freshDeal = game.serial === game.lastDealSerial;
-      const hint = state.hint && !state.hint.suggestDeal ? state.hint : null;
 
       for (let column = 0; column < COLUMN_COUNT; column++) {
         const cards = game.columns[column];
@@ -463,14 +420,10 @@
           const isLifted = dragSession && dragSession.from === column && row >= dragSession.index;
           const movable = movableRun(cards, row);
           const selected = state.selectedFrom === column && row >= (state.selectedIndex || 0);
-          const hintedSource = hint && hint.from === column && row >= hint.index;
-          const hintedTarget = hint && hint.to === column && row === cards.length - 1;
-          const showTargetGlow = (hoverTarget === column && dragSession && canDrop(dragSession.cards, cards)) ||
-            (hint && hint.to === column && !hint.suggestDeal);
+          const showTargetGlow = hoverTarget === column && dragSession && canDrop(dragSession.cards, cards);
           const node = buildCardNode(card, column, row, {
             fresh: freshDeal && row === cards.length - 1 && !isLifted,
             selected,
-            hinted: (hintedSource || hintedTarget) && !isLifted,
             lifted: !!isLifted,
             interactive: !isLifted,
           });
@@ -495,8 +448,7 @@
         });
         // 空列提示光晕
         if (cards.length === 0) {
-          const glow = (hoverTarget === column && dragSession && dragSession.cards.length) ||
-            (hint && hint.to === column && !hint.suggestDeal);
+          const glow = hoverTarget === column && dragSession && dragSession.cards.length;
           empty.classList.toggle("target-glow", !!glow);
         }
         board.appendChild(colEl);
@@ -974,7 +926,7 @@
           suits: "ONE", columns, stock: [], completed: [],
           score: 500, moves: 0, status: "PLAYING", serial: 1, lastDealSerial: -1,
         };
-        Object.assign(state, { selectedFrom: null, selectedIndex: null, canUndo: false, hint: null });
+        Object.assign(state, { selectedFrom: null, selectedIndex: null, canUndo: false });
         renderAll();
       },
       state,
