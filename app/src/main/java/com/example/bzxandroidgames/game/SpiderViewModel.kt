@@ -18,7 +18,7 @@ data class SpiderUiState(
 
 class SpiderViewModel(application: Application) : AndroidViewModel(application) {
     private val preferences = application.getSharedPreferences("game", 0)
-    private val history = ArrayDeque<SpiderGame>()
+    private val history = SpiderHistory()
 
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<SpiderUiState> = _state.asStateFlow()
@@ -33,12 +33,13 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
     fun tapCard(column: Int, index: Int) {
         val current = _state.value
         val game = current.game
+        if (column !in game.columns.indices || index !in game.columns[column].indices) return
         if (game.status == SpiderStatus.WON) return
         val heldFrom = current.selectedFrom
         if (heldFrom != null && heldFrom != column) {
             val moved = SpiderSolitaire.move(game, heldFrom, current.selectedIndex!!, column)
             if (moved != null) {
-                history.addLast(game)
+                history.record(game)
                 _state.value = current.copy(
                     game = moved,
                     selectedFrom = null,
@@ -50,12 +51,10 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         // No move happened: (re)select the tapped run, or drop the selection.
-        if (SpiderSolitaire.movableRun(game.columns[column], index) && heldFrom != column) {
-            _state.value = current.copy(selectedFrom = column, selectedIndex = index)
-        } else if (heldFrom != null && heldFrom == column && current.selectedIndex == index) {
+        if (heldFrom == column && current.selectedIndex == index) {
             _state.value = current.copy(selectedFrom = null, selectedIndex = null)
-        } else if (heldFrom == column) {
-            _state.value = current.copy(selectedFrom = column, selectedIndex = index)
+        } else if (SpiderSolitaire.movableRun(game.columns[column], index)) {
+            _state.value = current.copy(selectedFrom = column, selectedIndex = index, hint = null)
         } else {
             _state.value = current.copy(selectedFrom = null, selectedIndex = null)
         }
@@ -73,7 +72,7 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
     fun selectRun(column: Int, index: Int) {
         val current = _state.value
         if (current.game.status == SpiderStatus.WON) return
-        _state.value = if (SpiderSolitaire.movableRun(current.game.columns[column], index))
+        _state.value = if (column in current.game.columns.indices && SpiderSolitaire.movableRun(current.game.columns[column], index))
             current.copy(selectedFrom = column, selectedIndex = index)
         else
             current.copy(selectedFrom = null, selectedIndex = null)
@@ -86,11 +85,13 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
     /** Drops a lifted run onto a column; an illegal drop just clears the selection. */
     fun dropRun(from: Int, index: Int, to: Int) {
         val current = _state.value
+        if (current.game.status != SpiderStatus.PLAYING) return
         if (from == to) {
             _state.value = current.copy(selectedFrom = null, selectedIndex = null)
             return
         }
         val moved = SpiderSolitaire.move(current.game, from, index, to)
+        if (moved != null) history.record(current.game)
         _state.value = if (moved != null)
             current.copy(
                 game = moved,
@@ -106,7 +107,7 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
     fun deal() {
         val current = _state.value
         val dealt = SpiderSolitaire.deal(current.game) ?: return
-        history.addLast(current.game)
+        history.record(current.game)
         _state.value = current.copy(
             game = dealt,
             selectedFrom = null,
@@ -118,17 +119,12 @@ class SpiderViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Classic behaviour: an undo restores the position but still costs one move. */
     fun undo() {
-        val previous = history.removeLastOrNull() ?: return
-        val game = previous.copy(
-            moves = previous.moves + 1,
-            score = 500 - (previous.moves + 1) + 100 * previous.completed.size,
-            serial = _state.value.game.serial + 1
-        )
+        val game = history.undo(_state.value.game) ?: return
         _state.value = _state.value.copy(
             game = game,
             selectedFrom = null,
             selectedIndex = null,
-            canUndo = history.isNotEmpty(),
+            canUndo = history.canUndo,
             hint = null
         )
     }

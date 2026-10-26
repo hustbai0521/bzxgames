@@ -28,17 +28,20 @@ class TetrisTest {
         level = level
     )
 
-    @Test fun `new game spawns a piece over an empty well`() {
+    @Test fun `new game waits in ready state over an empty well`() {
         val game = Tetris.newGame(0)
         assertEquals(0, game.score)
         assertEquals(1, game.level)
-        assertEquals(800L, game.dropInterval)
-        assertEquals(TetrisStatus.PLAYING, game.status)
+        assertEquals(600L, game.dropInterval)
+        assertEquals(TetrisStatus.READY, game.status)
         assertTrue(game.board.all { it == 0 })
         assertNotNull(game.falling)
         assertEquals(0, game.falling!!.y)
         assertEquals(5, game.queue.size)
         assertNotEquals(game.next, game.queue.first())
+        // tapping start flips ready into play; anything else is left alone
+        assertEquals(TetrisStatus.PLAYING, Tetris.started(game).status)
+        assertEquals(TetrisStatus.PAUSED, Tetris.started(game.copy(status = TetrisStatus.PAUSED)).status)
     }
 
     @Test fun `pieces slide but stop at the walls`() {
@@ -124,7 +127,7 @@ class TetrisTest {
         val after = Tetris.hardDrop(game)
         assertEquals(10, after.lines)
         assertEquals(2, after.level)
-        assertEquals(730L, after.dropInterval)
+        assertEquals(535L, after.dropInterval)
     }
 
     @Test fun `best score follows the running score`() {
@@ -146,11 +149,13 @@ class TetrisTest {
     }
 
     @Test fun `pause and resume only toggle each other`() {
-        val game = Tetris.newGame(0)
+        val game = Tetris.newGame(0).copy(status = TetrisStatus.PLAYING)
         assertEquals(TetrisStatus.PAUSED, Tetris.paused(game).status)
         assertEquals(TetrisStatus.PLAYING, Tetris.resumed(Tetris.paused(game)).status)
         // pause while already paused keeps it paused; resume while playing keeps it playing
         assertEquals(TetrisStatus.PAUSED, Tetris.paused(Tetris.paused(game)).status)
         assertEquals(TetrisStatus.PLAYING, Tetris.resumed(game).status)
+        // a ready game is untouched by pause
+        assertEquals(TetrisStatus.READY, Tetris.paused(Tetris.newGame(0)).status)
     }
 }

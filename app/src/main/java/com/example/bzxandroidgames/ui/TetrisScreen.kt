@@ -99,6 +99,7 @@ fun TetrisScreen(
     onRotate: () -> Unit,
     onSoftDrop: () -> Unit,
     onHardDrop: () -> Unit,
+    onStart: () -> Unit,
     onTick: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -170,8 +171,11 @@ fun TetrisScreen(
             Spacer(Modifier.height(12.dp))
         }
 
+        if (state.status == TetrisStatus.READY) {
+            TetrisStartOverlay(onStart, onBack)
+        }
         if (state.status == TetrisStatus.PAUSED) {
-            PauseOverlay(onResume)
+            PauseOverlay(onResume, onBack)
         }
     }
     if (state.status == TetrisStatus.OVER) {
@@ -226,7 +230,7 @@ private fun TetrisHeader(
             RoundAction(
                 if (state.status == TetrisStatus.PAUSED) "▶" else "⏸",
                 "暂停或继续",
-                state.status != TetrisStatus.OVER
+                state.status == TetrisStatus.PLAYING || state.status == TetrisStatus.PAUSED
             ) { if (state.status == TetrisStatus.PAUSED) onResume() else onPause() }
             Spacer(Modifier.size(9.dp))
             RoundAction("↻", "重新开始", true, onRestart)
@@ -526,8 +530,37 @@ private fun HintPill() {
     }
 }
 
+/** The arrival panel: the well is dealt, blocks start falling once the player begins. */
 @Composable
-private fun PauseOverlay(onResume: () -> Unit) {
+private fun TetrisStartOverlay(onStart: () -> Unit, onBack: () -> Unit) {
+    val palette = LocalGamePalette.current
+    Box(
+        Modifier.fillMaxSize().background(palette.primary.copy(alpha = .26f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            Modifier
+                .shadow(20.dp, RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(24.dp))
+                .background(palette.surface)
+                .border(1.dp, palette.primary.copy(alpha = .4f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("准备好了吗？", color = palette.text, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            Spacer(Modifier.height(6.dp))
+            Text("◀ ▼ ▶ 可长按连移，⟳ 旋转，⇓ 直落井底", color = palette.mutedText, fontSize = 12.sp)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OverlayPill("开始游戏", filled = true) { onStart() }
+                OverlayPill("返回大厅", filled = false) { onBack() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PauseOverlay(onResume: () -> Unit, onBack: () -> Unit) {
     val palette = LocalGamePalette.current
     Box(
         Modifier
@@ -546,14 +579,36 @@ private fun PauseOverlay(onResume: () -> Unit) {
                 .clip(RoundedCornerShape(24.dp))
                 .background(palette.surface)
                 .border(1.dp, palette.primary.copy(alpha = .4f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 30.dp, vertical = 22.dp),
+                .padding(horizontal = 28.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("已暂停", color = palette.text, fontSize = 22.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(6.dp))
-            Text("轻点任意位置继续", color = palette.mutedText, fontSize = 12.sp)
+            Text("轻点遮罩继续，或从下面选择", color = palette.mutedText, fontSize = 12.sp)
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OverlayPill("继续游戏", filled = true) { onResume() }
+                OverlayPill("返回大厅", filled = false) { onBack() }
+            }
         }
     }
+}
+
+@Composable
+private fun OverlayPill(label: String, filled: Boolean, onClick: () -> Unit) {
+    val palette = LocalGamePalette.current
+    Text(
+        label,
+        color = if (filled) Color.White else palette.primary,
+        fontSize = 13.sp,
+        fontWeight = if (filled) FontWeight.Bold else FontWeight.Medium,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (filled) palette.secondary else Color.Transparent)
+            .border(1.dp, palette.primary.copy(alpha = if (filled) 0f else .45f), RoundedCornerShape(50))
+            .clickSfx(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 9.dp)
+    )
 }
 
 @Composable

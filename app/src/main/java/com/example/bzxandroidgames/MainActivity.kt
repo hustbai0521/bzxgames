@@ -100,16 +100,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.example.bzxandroidgames.game.Game2048
 import com.example.bzxandroidgames.game.GomokuViewModel
+import com.example.bzxandroidgames.game.LinkViewModel
 import com.example.bzxandroidgames.game.MinesweeperViewModel
 import com.example.bzxandroidgames.game.MoveResult
 import com.example.bzxandroidgames.game.SpiderViewModel
+import com.example.bzxandroidgames.game.SudokuViewModel
+import com.example.bzxandroidgames.game.SnakeViewModel
 import com.example.bzxandroidgames.game.TetrisViewModel
 import com.example.bzxandroidgames.sound.LocalSoundController
 import com.example.bzxandroidgames.sound.SoundController
 import com.example.bzxandroidgames.sound.clickSfx
 import com.example.bzxandroidgames.ui.GomokuScreen
+import com.example.bzxandroidgames.ui.LinkScreen
 import com.example.bzxandroidgames.ui.MinesweeperScreen
+import com.example.bzxandroidgames.ui.SnakeScreen
 import com.example.bzxandroidgames.ui.SpiderScreen
+import com.example.bzxandroidgames.ui.SudokuScreen
 import com.example.bzxandroidgames.ui.TetrisScreen
 import kotlin.math.abs
 import kotlin.math.cos
@@ -125,12 +131,18 @@ class MainActivity : ComponentActivity() {
             val mines: MinesweeperViewModel = viewModel()
             val spider: SpiderViewModel = viewModel()
             val tetris: TetrisViewModel = viewModel()
+            val snake: SnakeViewModel = viewModel()
+            val link: LinkViewModel = viewModel()
+            val sudoku: SudokuViewModel = viewModel()
             val theme by game.theme.collectAsStateWithLifecycle()
             val state by game.state.collectAsStateWithLifecycle()
             val gomokuState by gomoku.state.collectAsStateWithLifecycle()
             val minesState by mines.state.collectAsStateWithLifecycle()
             val spiderState by spider.state.collectAsStateWithLifecycle()
             val tetrisState by tetris.state.collectAsStateWithLifecycle()
+            val snakeState by snake.state.collectAsStateWithLifecycle()
+            val linkState by link.state.collectAsStateWithLifecycle()
+            val sudokuState by sudoku.state.collectAsStateWithLifecycle()
             val sound = remember { SoundController(applicationContext) }
             CompositionLocalProvider(LocalSoundController provides sound) {
                 BzxAndroidGamesTheme(theme) {
@@ -173,6 +185,9 @@ class MainActivity : ComponentActivity() {
                             currentGame == "mines" -> "mines"
                             currentGame == "spider" -> "spider"
                             currentGame == "tetris" -> "tetris"
+                            currentGame == "snake" -> "snake"
+                            currentGame == "link" -> "link"
+                            currentGame == "sudoku" -> "sudoku"
                             currentGame == "settings" -> "settings"
                             else -> "library"
                         },
@@ -233,10 +248,48 @@ class MainActivity : ComponentActivity() {
                             onRotate = tetris::rotate,
                             onSoftDrop = tetris::softDrop,
                             onHardDrop = tetris::hardDrop,
+                            onStart = tetris::start,
                             onTick = tetris::tick,
                             onPause = tetris::autoPause,
                             onResume = tetris::resume,
                             onRestart = tetris::restart
+                        )
+                    } else if (screen == "snake") {
+                        SnakeScreen(
+                            state = snakeState,
+                            onBack = { currentGame = null },
+                            onTurn = snake::turn,
+                            onStart = snake::start,
+                            onTick = snake::tick,
+                            onPause = snake::autoPause,
+                            onResume = snake::resume,
+                            onRestart = snake::restart
+                        )
+                    } else if (screen == "link") {
+                        LinkScreen(
+                            state = linkState,
+                            onBack = { currentGame = null },
+                            onSelect = link::select,
+                            onHint = link::requestHint,
+                            onClearHint = link::clearHint,
+                            onShuffle = link::shuffle,
+                            onTick = link::tick,
+                            onRestart = link::restart
+                        )
+                    } else if (screen == "sudoku") {
+                        SudokuScreen(
+                            state = sudokuState,
+                            active = currentGame == "sudoku",
+                            onBack = { currentGame = null },
+                            onStart = sudoku::start,
+                            onRestart = sudoku::restart,
+                            onSelectDifficulty = sudoku::selectDifficulty,
+                            onSelect = sudoku::select,
+                            onInput = sudoku::input,
+                            onErase = sudoku::erase,
+                            onUndo = sudoku::undo,
+                            onToggleNotes = sudoku::toggleNotes,
+                            onTick = sudoku::tick
                         )
                     } else if (screen == "settings") {
                         com.example.bzxandroidgames.ui.SettingsScreen(
@@ -250,6 +303,9 @@ class MainActivity : ComponentActivity() {
                             onMinesweeper = { currentGame = "mines" },
                             onSpider = { currentGame = "spider" },
                             onTetris = { currentGame = "tetris" },
+                            onSnake = { currentGame = "snake" },
+                            onLink = { currentGame = "link" },
+                            onSudoku = { sudoku.restart(); currentGame = "sudoku" },
                             onSettings = { currentGame = "settings" },
                             onSkyVisibleChange = { librarySkyVisible = it }
                         )

@@ -27,6 +27,7 @@ class TetrisViewModel(application: Application) : AndroidViewModel(application) 
     fun softDrop() = update(Tetris::softDrop)
     fun hardDrop() = update(Tetris::hardDrop)
     fun tick() = update(Tetris::tick)
+    fun start() = update(Tetris::started)
 
     fun pause() = update(Tetris::paused)
     fun resume() = update(Tetris::resumed)

@@ -48,6 +48,9 @@ fun GameLibrary(
     onMinesweeper: () -> Unit = {},
     onSpider: () -> Unit = {},
     onTetris: () -> Unit = {},
+    onSnake: () -> Unit = {},
+    onLink: () -> Unit = {},
+    onSudoku: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSkyVisibleChange: (Boolean) -> Unit = {}
 ) {
@@ -130,14 +133,15 @@ fun GameLibrary(
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("下一站，小惊喜", color = DeepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("2 款筹备中", color = SoftInk, fontSize = 10.sp)
+                    Text("6 款全上线", color = SoftInk, fontSize = 10.sp)
                 }
                 val games = listOf(
-                    UpcomingGame("贪吃蛇", "一路生长", 0),
+                    UpcomingGame("贪吃蛇", "一路生长", 0, ready = true, route = "snake"),
                     UpcomingGame("俄罗斯方块", "拼出新可能", 1, ready = true, route = "tetris"),
-                    UpcomingGame("连连看", "遇见成双的美好", 2),
+                    UpcomingGame("连连看", "遇见成双的美好", 2, ready = true, route = "link"),
                     UpcomingGame("蜘蛛纸牌", "理好每一手牌", 3, ready = true, route = "spider"),
-                    UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true, route = "mines")
+                    UpcomingGame("扫雷", "每一步都是灵感", 4, ready = true, route = "mines"),
+                    UpcomingGame("数独", "静下心来的推演", 5, ready = true, route = "sudoku")
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     games.chunked(2).forEach { pair ->
@@ -148,6 +152,9 @@ fun GameLibrary(
                                         "mines" -> onMinesweeper()
                                         "spider" -> onSpider()
                                         "tetris" -> onTetris()
+                                        "snake" -> onSnake()
+                                        "link" -> onLink()
+                                        "sudoku" -> onSudoku()
                                         else -> upcoming = game.name
                                     }
                                 }
@@ -324,6 +331,18 @@ private fun UpcomingIcon(kind: Int, modifier: Modifier) {
                 drawRoundRect(Color(0xFFFAFCF7), Offset(w * .32f, h * .2f), Size(w * .58f, h * .77f), CornerRadius(3.dp.toPx()))
                 drawRoundRect(ink, Offset(w * .32f, h * .2f), Size(w * .58f, h * .77f), CornerRadius(3.dp.toPx()), style = Stroke(stroke))
                 drawCircle(ink, w * .1f, Offset(w * .61f, h * .56f))
+            }
+            5 -> {
+                val pad = w * .08f
+                val step = (w - pad * 2) / 3
+                repeat(4) { line ->
+                    val xy = pad + line * step
+                    drawLine(ink, Offset(xy, pad), Offset(xy, h - pad), stroke * .65f)
+                    drawLine(ink, Offset(pad, xy), Offset(w - pad, xy), stroke * .65f)
+                }
+                listOf(0 to 0, 2 to 1, 1 to 2).forEach { (col, row) ->
+                    drawCircle(ink, step * .16f, Offset(pad + (col + .5f) * step, pad + (row + .5f) * step))
+                }
             }
             else -> {
                 drawCircle(ink, w * .24f, center, style = Stroke(stroke))

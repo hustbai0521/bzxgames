@@ -80,9 +80,10 @@ object SpiderSolitaire {
     }
 
     fun canDrop(run: List<SpiderCard>, target: List<SpiderCard>): Boolean =
-        target.isEmpty() || target.last().rank == run.first().rank + 1
+        run.isNotEmpty() && (target.isEmpty() || (target.last().faceUp && target.last().rank == run.first().rank + 1))
 
     fun move(game: SpiderGame, from: Int, index: Int, to: Int): SpiderGame? {
+        if (game.status != SpiderStatus.PLAYING) return null
         if (from !in game.columns.indices || to !in game.columns.indices || from == to) return null
         if (!movableRun(game.columns[from], index)) return null
         val source = game.columns[from]
@@ -96,6 +97,7 @@ object SpiderSolitaire {
 
     /** Deals one card face-up onto each column; refused while any column is empty. */
     fun deal(game: SpiderGame, random: Random = Random.Default): SpiderGame? {
+        if (game.status != SpiderStatus.PLAYING) return null
         if (game.stock.size < COLUMN_COUNT) return null
         if (game.columns.any { it.isEmpty() }) return null
         val dealt = game.stock.take(COLUMN_COUNT).map { it.copy(faceUp = true) }
@@ -178,4 +180,19 @@ object SpiderSolitaire {
         if (column.isNotEmpty() && !column.last().faceUp)
             column.dropLast(1) + listOf(column.last().copy(faceUp = true))
         else column
+}
+
+/** Position snapshots restore cards, while the cumulative move cost never rewinds. */
+class SpiderHistory {
+    private val positions = ArrayDeque<SpiderGame>()
+    val canUndo: Boolean get() = positions.isNotEmpty()
+
+    fun record(game: SpiderGame) { positions.addLast(game) }
+    fun clear() { positions.clear() }
+    fun undo(current: SpiderGame): SpiderGame? {
+        val previous = positions.removeLastOrNull() ?: return null
+        val moves = current.moves + 1
+        return previous.copy(moves = moves, score = 500 - moves + 100 * previous.completed.size,
+            serial = current.serial + 1, lastDealSerial = -1)
+    }
 }

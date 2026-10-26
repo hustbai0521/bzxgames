@@ -178,4 +178,56 @@ class SpiderSolitaireTest {
             SpiderSolitaire.newGame(SpiderSuits.FOUR).columns
         )
     }
+
+    @Test fun `undo restores a moved run and charges every undo cumulatively`() {
+        val start = gameWith(listOf(listOf(card(0, 6), card(0, 5)), listOf(card(1, 7)), emptyList()))
+        val history = SpiderHistory()
+        history.record(start)
+        val moved = SpiderSolitaire.move(start, 0, 0, 1)!!
+        history.record(moved)
+        val movedAgain = SpiderSolitaire.move(moved, 1, 1, 2)!!
+        val undone = history.undo(movedAgain)!!
+        assertEquals(moved.columns, undone.columns)
+        assertEquals(3, undone.moves)
+        assertEquals(497, undone.score)
+        assertTrue(history.canUndo)
+        val undoneAgain = history.undo(undone)!!
+        assertEquals(start.columns, undoneAgain.columns)
+        assertEquals(4, undoneAgain.moves)
+        assertEquals(496, undoneAgain.score)
+        assertFalse(history.canUndo)
+        assertNull(history.undo(undoneAgain))
+    }
+
+    @Test fun `undo restores stock collections and exposed card backs`() {
+        val start = gameWith(listOf(
+            listOf(card(0, 9, faceUp = false)) + (13 downTo 2).map { card(0, it) },
+            listOf(card(0, 1))
+        ))
+        val history = SpiderHistory()
+        history.record(start)
+        val completed = SpiderSolitaire.move(start, 1, 0, 0)!!
+        assertEquals(1, completed.completed.size)
+        val restored = history.undo(completed)!!
+        assertEquals(start.columns, restored.columns)
+        assertEquals(start.stock, restored.stock)
+        assertTrue(restored.completed.isEmpty())
+        assertEquals(498, restored.score)
+        assertFalse(restored.columns[0][0].faceUp)
+        val dealStart = SpiderSolitaire.newGame(SpiderSuits.ONE, kotlin.random.Random(1))
+        history.record(dealStart)
+        val dealt = SpiderSolitaire.deal(dealStart)!!
+        val undoneDeal = history.undo(dealt)!!
+        assertEquals(dealStart.stock, undoneDeal.stock)
+        assertEquals(dealStart.columns, undoneDeal.columns)
+        assertEquals(-1, undoneDeal.lastDealSerial)
+    }
+
+    @Test fun `finished games cannot deal or move and empty runs cannot drop`() {
+        val game = SpiderSolitaire.newGame(SpiderSuits.ONE).copy(status = SpiderStatus.WON)
+        assertNull(SpiderSolitaire.deal(game))
+        assertNull(SpiderSolitaire.move(game, 0, 5, 1))
+        assertFalse(SpiderSolitaire.canDrop(emptyList(), emptyList()))
+        assertFalse(SpiderSolitaire.canDrop(listOf(card(0, 5)), listOf(card(0, 6, false))))
+    }
 }

@@ -18,7 +18,7 @@ enum class Tetromino(val id: Int, val shape: List<String>) {
 /** A piece in flight: its shape (already rotated), board position, and type. */
 data class FallingPiece(val type: Tetromino, val x: Int, val y: Int, val cells: List<List<Boolean>>)
 
-enum class TetrisStatus { PLAYING, PAUSED, OVER }
+enum class TetrisStatus { READY, PLAYING, PAUSED, OVER }
 
 data class TetrisUiState(
     val board: List<Int> = List(Tetris.WIDTH * Tetris.HEIGHT) { 0 },
@@ -33,7 +33,7 @@ data class TetrisUiState(
     val moveId: Int = 0,
     val clearedRows: List<Int> = emptyList(),
     val clearId: Int = 0,
-    val dropInterval: Long = 800L
+    val dropInterval: Long = 600L
 )
 
 object Tetris {
@@ -45,13 +45,18 @@ object Tetris {
     fun newGame(best: Int, random: Random = Random.Default): TetrisUiState {
         val bag = shuffledBag(random)
         // falling = bag[0]; `next` previews bag[1]; the queue holds the rest of the bag.
+        // The well is dealt on arrival but only starts falling once the player begins.
         return TetrisUiState(
             falling = spawn(bag[0]),
             next = bag[1],
             queue = bag.drop(2),
-            best = best
+            best = best,
+            status = TetrisStatus.READY
         )
     }
+
+    fun started(state: TetrisUiState): TetrisUiState =
+        if (state.status == TetrisStatus.READY) state.copy(status = TetrisStatus.PLAYING) else state
 
     fun moveLeft(state: TetrisUiState) = shifted(state, -1, 0)
     fun moveRight(state: TetrisUiState) = shifted(state, 1, 0)
@@ -168,7 +173,7 @@ object Tetris {
             moveId = state.moveId + 1,
             clearedRows = fullRows,
             clearId = state.clearId + if (fullRows.isEmpty()) 0 else 1,
-            dropInterval = (800L - (level - 1) * 70L).coerceAtLeast(120L)
+            dropInterval = (600L - (level - 1) * 65L).coerceAtLeast(90L)
         )
     }
 

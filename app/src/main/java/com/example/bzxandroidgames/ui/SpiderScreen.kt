@@ -1,6 +1,8 @@
 package com.example.bzxandroidgames.ui
 
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -33,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -40,6 +43,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -53,12 +57,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +74,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.bzxandroidgames.game.SpiderCard
 import com.example.bzxandroidgames.game.SpiderGame
 import com.example.bzxandroidgames.game.SpiderSuits
@@ -112,39 +122,102 @@ fun SpiderScreen(
 ) {
     val game = state.game
     val context = LocalContext.current
+    var dealSource by remember { mutableStateOf<SpiderGame?>(null) }
+    val dealTime = remember(dealSource) { Animatable(0f) }
+    var rootOrigin by remember { mutableStateOf(Offset.Zero) }
+    var boardOrigin by remember { mutableStateOf(Offset.Zero) }
+    var boardSize by remember { mutableStateOf(IntSize.Zero) }
+    var stockOrigin by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    LaunchedEffect(dealSource) {
+        if (dealSource != null) {
+            dealTime.snapTo(0f)
+            dealTime.animateTo(1000f, tween(1000, easing = LinearEasing))
+            dealSource = null
+        }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val clearSelection by rememberUpdatedState(onClearSelection)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) { dealSource = null; clearSelection() }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(state.hintSerial, state.hint) {
         if (state.hint != null) {
             delay(2000)
             onClearHint()
         }
     }
-    BoxWithConstraints(
+    Box(
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(FeltTop, FeltBottom)))
     ) {
         FeltVignette()
-        val cardWidth = (maxWidth - 12.dp - 3.dp * 9) / 10f
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            SpiderTopBar(game, state.canUndo, onBack, onUndo, onRestart, onHint, onSelectSuits)
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()
+            .onGloballyPositioned { rootOrigin = it.boundsInRoot().topLeft }) {
+        val cardWidth = minOf((maxWidth - 12.dp - 3.dp * 9) / 10f, 130.dp)
+        val tableOffset = (maxWidth - (12.dp + cardWidth * 10 + 3.dp * 9)) / 2
+        // Show the dealt cards until all flights land, then reveal automatic collections.
+        val tableGame = dealSource?.let { source -> source.copy(columns = source.columns.mapIndexed { column, cards ->
+            cards + source.stock[column].copy(faceUp = true)
+        }) } ?: game
+        val dealing = dealSource != null
+        Column(Modifier.fillMaxSize()) {
+            SpiderTopBar(game, state.canUndo && !dealing, onBack, onUndo, onRestart, onHint, onSelectSuits, !dealing)
             SpiderBoard(
-                game = game,
+                game = tableGame,
                 state = state,
                 cardWidth = cardWidth,
-                modifier = Modifier.weight(1f),
+                tableOffset = tableOffset,
+                dealElapsed = if (dealing) dealTime.value else null,
+                enabled = !dealing,
+                modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned {
+                    boardOrigin = it.boundsInRoot().topLeft
+                    boardSize = it.size
+                },
                 onTapCard = onTapCard,
                 onTapColumn = onTapColumn,
                 onSelectRun = onSelectRun,
                 onDropRun = onDropRun,
                 onClearSelection = onClearSelection
             )
-            SpiderBottomStrip(game, cardWidth) { blocked ->
+            SpiderBottomStrip(game, cardWidth, !dealing, { stockOrigin = it }) { blocked ->
                 if (blocked) {
                     Toast.makeText(context, "有空列时不能发牌，先把牌填回去", Toast.LENGTH_SHORT).show()
-                } else onDeal()
+                } else {
+                    dealSource = game
+                    onClearSelection()
+                    onDeal()
+                }
             }
         }
-        if (game.status == SpiderStatus.WON) {
+        if (dealSource != null) {
+            for (column in 0 until SpiderSolitaire.COLUMN_COUNT) {
+                val elapsed = dealTime.value - column * 60f
+                if (elapsed >= 0f && elapsed < 260f) {
+                    val progress = FastOutSlowInEasing.transform((elapsed / 260f).coerceIn(0f, 1f))
+                    val targetY = spiderRowY(tableGame.columns[column], tableGame.columns[column].lastIndex,
+                        cardWidth * 1.4f, with(density) { boardSize.height.toDp() })
+                    val target = boardOrigin + with(density) {
+                        Offset((tableOffset + 6.dp + (cardWidth + 3.dp) * column).toPx(), targetY.toPx())
+                    }
+                    val position = stockOrigin + (target - stockOrigin) * progress - rootOrigin
+                    CardBack(cardWidth, Modifier.offset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }
+                        .graphicsLayer {
+                            transformOrigin = TransformOrigin(0f, 0f)
+                            rotationZ = -10f * (1f - progress)
+                            scaleX = .56f + .44f * progress
+                            scaleY = scaleX
+                        })
+                }
+            }
+        }
+        }
+        if (game.status == SpiderStatus.WON && dealSource == null) {
             WinOverlay(game, onRestart, onBack)
         }
     }
@@ -158,7 +231,8 @@ private fun SpiderTopBar(
     onUndo: () -> Unit,
     onRestart: () -> Unit,
     onHint: () -> Unit,
-    onSelectSuits: (SpiderSuits) -> Unit
+    onSelectSuits: (SpiderSuits) -> Unit,
+    enabled: Boolean
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
@@ -174,14 +248,15 @@ private fun SpiderTopBar(
                 FeltPill(
                     label = suits.title,
                     selected = game.suits == suits,
+                    enabled = enabled,
                     onClick = { onSelectSuits(suits) }
                 )
             }
         }
         Spacer(Modifier.weight(.4f))
-        FeltPill("新游戏 ↻", onClick = onRestart)
+        FeltPill("新游戏 ↻", enabled = enabled, onClick = onRestart)
         FeltPill("撤销 ↶", enabled = canUndo, onClick = onUndo)
-        FeltPill("提示", onClick = onHint)
+        FeltPill("提示", enabled = enabled, onClick = onHint)
         Spacer(Modifier.width(6.dp))
     }
 }
@@ -210,6 +285,9 @@ private fun SpiderBoard(
     game: SpiderGame,
     state: SpiderUiState,
     cardWidth: Dp,
+    tableOffset: Dp,
+    dealElapsed: Float?,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
     onTapCard: (Int, Int) -> Unit,
     onTapColumn: (Int) -> Unit,
@@ -221,12 +299,20 @@ private fun SpiderBoard(
     BoxWithConstraints(modifier) {
         val density = LocalDensity.current
         var drag by remember { mutableStateOf<DragState?>(null) }
+        val owner = LocalLifecycleOwner.current
+        DisposableEffect(owner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) drag = null
+            }
+            owner.lifecycle.addObserver(observer)
+            onDispose { owner.lifecycle.removeObserver(observer) }
+        }
+        LaunchedEffect(game.serial, game.suits, enabled) { drag = null }
         val available = maxHeight
-        val freshDeal = game.serial == game.lastDealSerial
         val downGap = cardHeight * .13f
         val upGap = cardHeight * .27f
 
-        fun columnX(column: Int): Dp = 6.dp + (cardWidth + 3.dp) * column
+        fun columnX(column: Int): Dp = tableOffset + 6.dp + (cardWidth + 3.dp) * column
         fun targetColumnAt(centerXPx: Float): Int? =
             (0 until SpiderSolitaire.COLUMN_COUNT).firstOrNull { column ->
                 val start = with(density) { columnX(column).toPx() }
@@ -256,14 +342,16 @@ private fun SpiderBoard(
                 columnX = columnX(column),
                 downGap = downGap * squeeze,
                 upGap = upGap * squeeze,
-                freshDeal = freshDeal,
+                dealElapsed = dealElapsed,
+                enabled = enabled,
                 drag = drag,
                 isTarget = hoverTarget == column,
                 onTapCard = onTapCard,
                 onTapColumn = onTapColumn,
                 onDragStart = { row, originY ->
                     val run = game.columns[column]
-                    drag = DragState(column, row, run.subList(row, run.size), columnX(column), originY, Offset.Zero)
+                    if (enabled && SpiderSolitaire.movableRun(run, row))
+                        drag = DragState(column, row, run.subList(row, run.size), columnX(column), originY, Offset.Zero)
                     onSelectRun(column, row)
                 },
                 onDrag = { amount ->
@@ -321,6 +409,18 @@ private data class DragState(
     val delta: Offset
 )
 
+private fun spiderRowY(cards: List<SpiderCard>, row: Int, cardHeight: Dp, available: Dp): Dp {
+    val downGap = cardHeight * .13f
+    val upGap = cardHeight * .27f
+    var needed = cardHeight
+    for (index in 1 until cards.size) needed += if (cards[index - 1].faceUp) upGap else downGap
+    val squeeze = if (needed > available && needed > cardHeight)
+        ((available - cardHeight) / (needed - cardHeight)).coerceIn(.22f, 1f) else 1f
+    var result = 0.dp
+    for (index in 0 until row) result += (if (cards[index].faceUp) upGap else downGap) * squeeze
+    return result
+}
+
 @Composable
 private fun ColumnArea(
     game: SpiderGame,
@@ -330,7 +430,8 @@ private fun ColumnArea(
     columnX: Dp,
     downGap: Dp,
     upGap: Dp,
-    freshDeal: Boolean,
+    dealElapsed: Float?,
+    enabled: Boolean,
     drag: DragState?,
     isTarget: Boolean,
     onTapCard: (Int, Int) -> Unit,
@@ -350,7 +451,7 @@ private fun ColumnArea(
             .offset(x = columnX)
             .width(cardWidth)
             .fillMaxHeight()
-            .clickable(onClickLabel = "放到第${column + 1}列") { onTapColumn(column) },
+            .clickable(enabled = enabled, onClickLabel = "放到第${column + 1}列") { onTapColumn(column) },
         contentAlignment = Alignment.TopStart
     ) {
         if (cards.isEmpty()) {
@@ -368,6 +469,8 @@ private fun ColumnArea(
         cards.forEachIndexed { row, card ->
             val rowY = y
             val isLifted = lifted != null && row >= lifted.index
+            val isDealt = dealElapsed != null && row == cards.lastIndex
+            val landed = dealElapsed != null && dealElapsed >= column * 60f + 260f
             val movable = SpiderSolitaire.movableRun(cards, row)
             val selected = state.selectedFrom == column && row >= (state.selectedIndex ?: 0)
             val hintedSource = hint != null && hint.from == column && row >= hint.index && !hint.suggestDeal
@@ -375,10 +478,10 @@ private fun ColumnArea(
                 Modifier
                     .offset(y = rowY)
                     .size(cardWidth, cardHeight)
-                    .alpha(if (isLifted) .3f else 1f)
-                    .pointerInput(column, row, movable, cards.size) {
+                    .alpha(if (isLifted || (isDealt && !landed)) 0f else 1f)
+                    .pointerInput(column, row, movable, game.serial, game.suits, enabled) {
                         detectDragGestures(
-                            onDragStart = { if (movable) onDragStart(row, rowY) },
+                            onDragStart = { if (movable && enabled) onDragStart(row, rowY) },
                             onDrag = { change, amount ->
                                 change.consume()
                                 onDrag(amount)
@@ -391,9 +494,10 @@ private fun ColumnArea(
                 CardFace(
                     card = card,
                     cardWidth = cardWidth,
-                    fresh = freshDeal && row == cards.lastIndex && !isLifted,
+                    fresh = isDealt && landed,
                     selected = selected,
                     highlighted = hintedSource || (showTarget && row == cards.lastIndex),
+                    interactive = enabled,
                     onClick = { onTapCard(column, row) }
                 )
             }
@@ -414,6 +518,10 @@ private fun CardFace(
     liftShadow: Boolean = false,
     onClick: () -> Unit = {}
 ) {
+    if (!card.faceUp) {
+        CardBack(cardWidth, modifier)
+        return
+    }
     val cardHeight = cardWidth * 1.4f
     var appeared by remember(fresh) { mutableFloatStateOf(if (fresh) .5f else 1f) }
     LaunchedEffect(fresh) { if (fresh) appeared = 1f }
@@ -598,6 +706,8 @@ private fun rankLabel(rank: Int): String = when (rank) {
 private fun SpiderBottomStrip(
     game: SpiderGame,
     cardWidth: Dp,
+    enabled: Boolean,
+    onStockPosition: (Offset) -> Unit,
     onDeal: (blocked: Boolean) -> Unit
 ) {
     val miniWidth = cardWidth * .56f
@@ -641,9 +751,12 @@ private fun SpiderBottomStrip(
         val blocked = game.stock.size >= SpiderSolitaire.COLUMN_COUNT && game.columns.any { it.isEmpty() }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickSfx(enabled = game.stock.isNotEmpty(), onClickLabel = "发牌") { onDeal(blocked) }
+            modifier = Modifier.clickSfx(enabled = enabled && game.stock.isNotEmpty() && game.status == SpiderStatus.PLAYING,
+                onClickLabel = "发牌") { onDeal(blocked) }
         ) {
-            Box {
+            val piles = game.stock.size / SpiderSolitaire.COLUMN_COUNT
+            Box(Modifier.size(miniWidth + 9.dp * (piles - 1).coerceAtLeast(0), miniHeight)
+                .onGloballyPositioned { onStockPosition(it.boundsInRoot().topLeft) }) {
                 if (game.stock.isEmpty()) {
                     Box(Modifier.size(miniWidth, miniHeight).border(1.dp, Color.White.copy(alpha = .3f), cardShape))
                 }
