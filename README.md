@@ -67,6 +67,10 @@ bzxwebgames/
 - 蜘蛛纸牌：鼠标拖拽 + 悬停绿色高亮 + 抓取光标
 - 全站：浏览器返回键（hash 路由）等价于安卓返回键；切走标签页自动暂停（等价 ON_PAUSE）
 
+## 回归测试
+
+安装 Node.js 后运行 `node --test tests/tetris.test.cjs`，验证俄罗斯方块的连续旋转、幽灵投影、硬降、碰撞与消行；测试包含超时保护，可检测导致页面卡死的无限循环。
+
 ## 版本信息
 
 与应用一致：V1.0.0 · 作者 BZX · 3346937394@qq.com · github.com/hustbai0521/bzxgames

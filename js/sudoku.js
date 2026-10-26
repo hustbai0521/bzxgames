@@ -3,7 +3,7 @@
    引擎：随机生成完整终盘 → 挖洞并保证唯一解（MRV 回溯计数）；
    三档难度（简单 40 提示数 / 中等 31 / 困难 26）。
    功能：笔记（候选数）、冲突高亮、同行同列同宫与同数字联动高亮、
-   撤销、橡皮、计时、最佳纪录（按难度持久化）。
+   撤销、橡皮、点击开始后出题与计时、最佳纪录（按难度持久化）。
    桌面适配：方向键移动选格、1-9 填数、退格擦除、N 切换笔记。
    ============================================================ */
 (function () {
@@ -160,30 +160,43 @@
     const difficulty = BZX.store.get("sudokuDifficulty", "EASY");
     const state = {
       difficulty,
-      puzzle: null, solution: null,
+      puzzle: new Array(81).fill(0), solution: null,
       cells: new Array(81).fill(0),
       notes: new Array(81).fill(0),
       selected: null,
       noteMode: BZX.store.get("sudokuNoteMode", false),
       timeSeconds: 0,
-      status: "PLAYING", // PLAYING | DONE
+      status: "READY", // READY | PLAYING | DONE
       undoStack: [],
       moveId: 0,
     };
     let best = BZX.store.get("sudokuBest_" + difficulty, 0);
+    let timer = null;
 
     function newGame() {
+      clearInterval(timer);
+      timer = null;
+      state.puzzle = new Array(81).fill(0);
+      state.solution = null;
+      state.cells = new Array(81).fill(0);
+      state.notes = new Array(81).fill(0);
+      state.selected = null;
+      state.timeSeconds = 0;
+      state.status = "READY";
+      state.undoStack = [];
+      state.moveId++;
+      best = BZX.store.get("sudokuBest_" + state.difficulty, 0);
+    }
+
+    function startGame() {
+      if (state.status !== "READY") return;
       const g = generate(state.difficulty);
       state.puzzle = g.puzzle;
       state.solution = g.solution;
       state.cells = g.puzzle.slice();
-      state.notes = new Array(81).fill(0);
-      state.selected = null;
-      state.timeSeconds = 0;
       state.status = "PLAYING";
-      state.undoStack = [];
-      state.moveId++;
-      best = BZX.store.get("sudokuBest_" + state.difficulty, 0);
+      renderAll();
+      startTimer();
     }
 
     /* ---------------- 界面骨架 ---------------- */
@@ -240,6 +253,14 @@
     const diffRow = el("div", "sudoku-diff-row");
     col.appendChild(diffRow);
     col.appendChild(spacer(12));
+
+    const startRow = el("div");
+    const startBtn = el("button", "overlay-pill pill-themed-filled", "开始游戏");
+    startBtn.style.width = "100%";
+    BZX.sfxButton(startBtn, startGame);
+    startRow.appendChild(startBtn);
+    startRow.appendChild(spacer(12));
+    col.appendChild(startRow);
 
     /* board */
     const boardWrap = el("div", "sudoku-board-wrap");
@@ -300,6 +321,7 @@
         if (c === 2 || c === 5) cell.classList.add("b-right");
         if (r === 2 || r === 5) cell.classList.add("b-bottom");
         cell.addEventListener("click", () => {
+          if (state.status !== "PLAYING") return;
           state.selected = i;
           renderBoard();
         });
@@ -309,6 +331,8 @@
     }
 
     function renderBoard() {
+      const playing = state.status === "PLAYING";
+      startRow.hidden = state.status !== "READY";
       const conflicts = {};
       for (let i = 0; i < 81; i++) if (conflictAt(state.cells, i)) conflicts[i] = true;
       const selVal = state.selected !== null ? state.cells[state.selected] : 0;
@@ -346,8 +370,11 @@
       numBtns.forEach((b, idx) => {
         const v = idx + 1;
         b.classList.toggle("num-done", counts[v] >= 9);
+        b.disabled = !playing;
       });
-      undoBtn.disabled = state.undoStack.length === 0;
+      undoBtn.disabled = !playing || state.undoStack.length === 0;
+      eraseBtn.disabled = !playing;
+      noteToggle.disabled = !playing;
       timeCard.set(fmt(state.timeSeconds));
       bestCard.set(best ? fmt(best) : "--");
     }
@@ -460,15 +487,18 @@
 
     /* ---------------- 计时与输入 ---------------- */
 
-    const timer = setInterval(() => {
-      if (state.status === "PLAYING" && !document.hidden) {
-        state.timeSeconds++;
-        timeCard.set(fmt(state.timeSeconds));
-      }
-    }, 1000);
+    function startTimer() {
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (state.status === "PLAYING" && !document.hidden) {
+          state.timeSeconds++;
+          timeCard.set(fmt(state.timeSeconds));
+        }
+      }, 1000);
+    }
 
     const keyHandler = (e) => {
-      if (!root.isConnected) return;
+      if (!root.isConnected || state.status !== "PLAYING") return;
       if (e.key >= "1" && e.key <= "9") { inputDigit(Number(e.key)); e.preventDefault(); return; }
       if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") { erase(); e.preventDefault(); return; }
       if (e.key === "n" || e.key === "N") {

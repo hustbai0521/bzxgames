@@ -29,7 +29,8 @@
     const out = [];
     for (let newY = 0; newY < columns; newY++) {
       const line = [];
-      for (let newX = 0; newX < rows; newX++) line.push(cells[rows - 1 - newX][newY] === 1);
+      // Preserve numeric 0/1 cells so repeated rotations do not erase the piece.
+      for (let newX = 0; newX < rows; newX++) line.push(cells[rows - 1 - newX][newY]);
       out.push(line);
     }
     return out;
@@ -63,13 +64,14 @@
 
   function dropPosition(board, piece) {
     let distance = 0;
-    let probe = piece;
-    for (;;) {
-      const next = Object.assign({}, probe, { y: probe.y + 1 });
-      if (collides(board, next)) return distance;
-      probe = next;
+    // Spawned pieces reach the floor within HEIGHT steps. Bound the search so
+    // malformed (e.g. empty) cells cannot hang ghost rendering or hard drops.
+    while (distance < HEIGHT) {
+      const next = Object.assign({}, piece, { y: piece.y + distance + 1 });
+      if (collides(board, next)) break;
       distance++;
     }
+    return distance;
   }
 
   function newGame(best) {
@@ -167,15 +169,8 @@
     },
     hardDrop(s) {
       if (!s.falling) return;
-      let distance = 0;
-      let dropped = s.falling;
-      for (;;) {
-        const next = Object.assign({}, dropped, { y: dropped.y + 1 });
-        if (collides(s.board, next)) break;
-        dropped = next;
-        distance++;
-      }
-      s.falling = dropped;
+      const distance = dropPosition(s.board, s.falling);
+      s.falling = Object.assign({}, s.falling, { y: s.falling.y + distance });
       s.score += distance * 2;
       lock(s);
     },
