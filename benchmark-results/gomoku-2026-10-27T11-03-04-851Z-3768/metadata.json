@@ -1,0 +1,13 @@
+{
+  "games": 100,
+  "maxMs": 3000,
+  "concurrency": 2,
+  "seed": "0x1e775eed",
+  "openingDescription": "50 paired, dihedrally unique, randomly forced four-ply openings near centre; same prefix for both AI colours",
+  "engineSHA256": "0be65c603953efd0699b166457dfa615f0ecc20d7d9e11c7ad9fae685329445b",
+  "baselineSHA256": "6fa717f5d89817794de00723b8714dda90c5a59db80f06b0f1e28d81fd321d5a",
+  "benchmarkSHA256": "226bc85407e3579eb20964eb4d7f89c1ef5116c586e1212b4a96af61fa758494",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13650HX",
+  "logicalCPUs": 20,
+  "started": "2026-10-27T11:03:04.939Z"
+}

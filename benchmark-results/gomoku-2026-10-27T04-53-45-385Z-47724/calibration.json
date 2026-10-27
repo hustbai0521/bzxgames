@@ -1,0 +1,18 @@
+{
+  "description": "Three-second searches on the same four-stone position, before the 100-game run; instrumented engine copy. Nodes and completed depths can vary with thermal state and background load.",
+  "position": [312, 339, 287, 314],
+  "single": [
+    {"nodes": 53568, "depth": 7}, {"nodes": 47936, "depth": 7},
+    {"nodes": 49280, "depth": 7}, {"nodes": 53888, "depth": 7}
+  ],
+  "twoWorkers": [
+    [{"nodes": 40357, "depth": 6}, {"nodes": 40672, "depth": 6}],
+    [{"nodes": 43520, "depth": 7}, {"nodes": 43552, "depth": 7}],
+    [{"nodes": 47008, "depth": 7}, {"nodes": 47008, "depth": 7}]
+  ],
+  "fourWorkers": [
+    [{"nodes": 41984, "depth": 6}, {"nodes": 42912, "depth": 7}, {"nodes": 42336, "depth": 6}, {"nodes": 43104, "depth": 7}],
+    [{"nodes": 42976, "depth": 7}, {"nodes": 42112, "depth": 6}, {"nodes": 42528, "depth": 6}, {"nodes": 42624, "depth": 6}],
+    [{"nodes": 41856, "depth": 6}, {"nodes": 41408, "depth": 6}, {"nodes": 40288, "depth": 6}, {"nodes": 40192, "depth": 6}]
+  ]
+}

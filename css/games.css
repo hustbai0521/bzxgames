@@ -239,6 +239,7 @@
 @keyframes think-pulse { from { opacity: .3; } to { opacity: 1; } }
 
 .segment-row { display: flex; gap: 10px; }
+.gomoku-difficulty { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .segment-option {
   flex: 1;
   min-height: 48px;
@@ -272,6 +273,13 @@
 }
 .shop-entry:hover { background: #fff; }
 
+.gomoku-board-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.gomoku-board-scroll.large-board .gomoku-board-wrap { min-width: 560px; }
 .gomoku-board-wrap {
   width: 100%;
   aspect-ratio: 1;
@@ -741,7 +749,7 @@
     justify-content: center;
     padding-bottom: 18px;
   }
-  .gomoku-boardcol .gomoku-board-wrap {
+  .gomoku-boardcol .gomoku-board-scroll {
     width: min(100%, calc(100vh - 170px));
   }
   .gomoku-boardcol .hint-pill { margin-top: 16px; }

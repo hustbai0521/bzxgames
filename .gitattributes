@@ -1,0 +1,2 @@
+# Benchmark metadata hashes the exact bytes of the saved source snapshots.
+benchmark-results/** -text

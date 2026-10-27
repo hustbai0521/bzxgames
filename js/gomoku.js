@@ -1,5 +1,5 @@
 /* ============================================================
-   gomoku.js — 五子棋（水墨木盘 / 作业本双皮肤，三档 AI）
+   gomoku.js — 五子棋（水墨木盘 / 作业本双皮肤）
    逻辑对应 game/Gomoku.kt + GomokuViewModel.kt。
    桌面适配：鼠标悬停显示落子预览（幽灵子）。
    ============================================================ */
@@ -36,7 +36,7 @@
   const HARD_SEARCH = { depth: 6, rootWidth: 10, nodeWidth: 6 };
 
   const opponent = (p) => (p === G.BLACK ? G.WHITE : G.BLACK);
-  const cellCount = G.SIZE * G.SIZE;
+  let cellCount = G.SIZE * G.SIZE;
 
   function winningLine(board, index) {
     const player = board[index];
@@ -172,6 +172,7 @@
   }
 
   function bestMove(board, player, difficulty) {
+    if (difficulty === "EXTREME") return window.GomokuExtreme.chooseMove(board, player);
     const foe = opponent(player);
     const grid = Int32Array.from(board);
     const candidates = candidateCells(grid);
@@ -184,10 +185,14 @@
 
   /* ---------------- state (GomokuViewModel.kt) ---------------- */
 
+  const initialMode = BZX.store.get("gomokuMode", "PVE");
+  const initialDifficulty = BZX.store.get("gomokuDifficulty", "MEDIUM");
+  G.SIZE = initialMode === "PVE" && initialDifficulty === "EXTREME" ? 25 : 15;
+  cellCount = G.SIZE * G.SIZE;
   const state = {
     board: new Array(cellCount).fill(G.EMPTY),
-    mode: BZX.store.get("gomokuMode", "PVE"),
-    difficulty: BZX.store.get("gomokuDifficulty", "MEDIUM"),
+    mode: initialMode,
+    difficulty: initialDifficulty,
     boardSkin: BZX.store.get("gomokuBoardSkin", "CLASSIC"),
     humanColor: BZX.store.get("gomokuHumanColor", "black") === "white" ? G.WHITE : G.BLACK,
     currentPlayer: G.BLACK,
@@ -202,8 +207,13 @@
   };
   const history = [];
   let aiTimer = null;
+  let aiWorker = null;
 
   function resetWith(mode, difficulty, humanColor) {
+    if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+    if (aiWorker) { aiWorker.terminate(); aiWorker = null; }
+    G.SIZE = mode === "PVE" && difficulty === "EXTREME" ? 25 : 15;
+    cellCount = G.SIZE * G.SIZE;
     history.length = 0;
     Object.assign(state, {
       mode, difficulty, humanColor,
@@ -247,16 +257,41 @@
     aiTimer = setTimeout(() => {
       const board = state.board;
       const difficulty = state.difficulty;
-      const move = bestMove(board, ai, difficulty); // race-guard: the check below mirrors maybeAiTurn
-      const now = state;
-      if (now.aiThinking && now.winner === null && !now.isDraw &&
-        now.currentPlayer === ai && now.moveId === position && now.board === board) {
-        applyMove(move, ai);
-        renderListeners.forEach((fn) => fn());
-      } else if (now.moveId === position && now.aiThinking) {
-        now.aiThinking = false;
-        renderListeners.forEach((fn) => fn());
+      function finish(move) {
+        const now = state;
+        if (now.aiThinking && now.winner === null && !now.isDraw &&
+          now.currentPlayer === ai && now.moveId === position && now.board === board &&
+          Number.isInteger(move) && move >= 0 && move < board.length && board[move] === G.EMPTY) {
+          applyMove(move, ai);
+          renderListeners.forEach((fn) => fn());
+        } else if (now.moveId === position && now.aiThinking) {
+          now.aiThinking = false;
+          renderListeners.forEach((fn) => fn());
+        }
       }
+      // Some browsers prohibit file:// workers. The same engine remains available
+      // synchronously as a fallback, so the offline entry point still works.
+      if (difficulty === "EXTREME" && typeof Worker !== "undefined") {
+        try {
+          const worker = new Worker("js/gomoku-extreme-worker.js?v=2");
+          aiWorker = worker;
+          worker.onmessage = (event) => {
+            if (aiWorker !== worker) return;
+            worker.terminate(); aiWorker = null;
+            if (event.data.error) finish(bestMove(board, ai, difficulty));
+            else finish(event.data.move);
+          };
+          worker.onerror = (event) => {
+            event.preventDefault();
+            if (aiWorker !== worker) return;
+            worker.terminate(); aiWorker = null;
+            finish(bestMove(board, ai, difficulty));
+          };
+          worker.postMessage({ id: position, board, player: ai });
+          return;
+        } catch (_) { if (aiWorker) { aiWorker.terminate(); aiWorker = null; } }
+      }
+      finish(bestMove(board, ai, difficulty));
     }, 220);
   }
 
@@ -367,7 +402,7 @@
     pveBlock.style.cssText = "overflow:hidden;max-height:0;opacity:0;transition:max-height 260ms ease,opacity 260ms ease;";
     const pveInner = el("div");
     pveInner.appendChild(spacer(10));
-    const diffRow = el("div", "segment-row");
+    const diffRow = el("div", "segment-row gomoku-difficulty");
     pveInner.appendChild(diffRow);
     pveInner.appendChild(spacer(10));
     const sideRow = el("div", "segment-row");
@@ -393,7 +428,7 @@
         BZX.store.set("gomokuMode", "PVP");
         if (state.mode !== "PVP") resetWith("PVP", state.difficulty, state.humanColor); else renderAll();
       });
-      segmentOption(modeRow, "人机对战", "挑战三档 AI", state.mode === "PVE", () => {
+      segmentOption(modeRow, "人机对战", "挑战四档 AI", state.mode === "PVE", () => {
         BZX.store.set("gomokuMode", "PVE");
         if (state.mode !== "PVE") resetWith("PVE", state.difficulty, state.humanColor); else renderAll();
       });
@@ -414,6 +449,10 @@
         segmentOption(diffRow, "困难", "算无遗策", state.difficulty === "HARD", () => {
           BZX.store.set("gomokuDifficulty", "HARD");
           resetWith(state.mode, "HARD", state.humanColor);
+        });
+        segmentOption(diffRow, "超困难", "25 路 · 极限挑战", state.difficulty === "EXTREME", () => {
+          BZX.store.set("gomokuDifficulty", "EXTREME");
+          resetWith(state.mode, "EXTREME", state.humanColor);
         });
         BZX.clear(sideRow);
         segmentOption(sideRow, "执黑", "先行落子", state.humanColor === G.BLACK, () => selectHumanColor(G.BLACK));
@@ -447,10 +486,12 @@
     infoCol.appendChild(spacer(16));
 
     /* board */
+    const boardScroller = el("div", "gomoku-board-scroll");
     const boardWrap = el("div", "gomoku-board-wrap");
     const boardCanvas = el("canvas");
     boardWrap.appendChild(boardCanvas);
-    boardCol.appendChild(boardWrap);
+    boardScroller.appendChild(boardWrap);
+    boardCol.appendChild(boardScroller);
     boardCol.appendChild(spacer(18));
 
     const hintPill = el("div", "hint-pill");
@@ -532,11 +573,13 @@
     function geometry() {
       const side = Math.min(fit.state.w, fit.state.h);
       const exercise = state.boardSkin === "EXERCISE";
-      const cell = exercise ? side / G.SIZE : side / (G.SIZE - 1);
+      // 25 路棋盘四周留出半个棋子的空间，边缘落子也能完整显示。
+      const inset = !exercise && G.SIZE === 25 ? side / 50 : 0;
+      const cell = exercise ? side / G.SIZE : (side - 2 * inset) / (G.SIZE - 1);
       const center = (index) => exercise
         ? { x: ((index % G.SIZE) + 0.5) * cell, y: (Math.floor(index / G.SIZE) + 0.5) * cell }
-        : { x: (index % G.SIZE) * cell, y: Math.floor(index / G.SIZE) * cell };
-      return { side, cell, center, exercise };
+        : { x: inset + (index % G.SIZE) * cell, y: inset + Math.floor(index / G.SIZE) * cell };
+      return { side, cell, center, exercise, inset };
     }
 
     function draw() {
@@ -544,7 +587,7 @@
       const { ctx, state: s } = fit;
       const { w, h } = s;
       ctx.clearRect(0, 0, w, h);
-      const { side, cell, center, exercise } = geometry();
+      const { side, cell, center, exercise, inset } = geometry();
       const ox = (w - side) / 2, oy = (h - side) / 2;
       ctx.save();
       ctx.translate(ox, oy);
@@ -578,16 +621,17 @@
         ctx.strokeStyle = hexA(P.GridInk, 0.85);
         ctx.lineWidth = 1;
         for (let i = 0; i < G.SIZE; i++) {
-          const p = i * cell;
-          ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(side, p); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, side); ctx.stroke();
+          const p = inset + i * cell;
+          ctx.beginPath(); ctx.moveTo(inset, p); ctx.lineTo(side - inset, p); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(p, inset); ctx.lineTo(p, side - inset); ctx.stroke();
         }
         ctx.strokeStyle = P.GridInk;
         ctx.lineWidth = 1.7;
-        ctx.strokeRect(0, 0, side, side);
-        [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]].forEach(([sx, sy]) => {
+        ctx.strokeRect(inset, inset, side - 2 * inset, side - 2 * inset);
+        const star = G.SIZE === 25 ? [4, 20, 12] : [3, 11, 7];
+        [[star[0], star[0]], [star[0], star[1]], [star[1], star[0]], [star[1], star[1]], [star[2], star[2]]].forEach(([sx, sy]) => {
           ctx.fillStyle = P.GridInk;
-          ctx.beginPath(); ctx.arc(sx * cell, sy * cell, 2.4, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(inset + sx * cell, inset + sy * cell, 2.4, 0, Math.PI * 2); ctx.fill();
         });
       }
 
@@ -717,7 +761,7 @@
         ctx.fillStyle = "rgba(138,133,112,.028)";
         ctx.beginPath(); ctx.arc(x, y, 0.7, 0, Math.PI * 2); ctx.fill();
       }
-      // 绿色方格（16 条线围出 15 格）
+      // 绿色方格（每个可落子格对应一格）
       for (let i = 0; i <= G.SIZE; i++) {
         const p = i * cell;
         ctx.strokeStyle = hexA(P.GridGreen, 0.4 + ((i * 37) % 13) / 42);
@@ -776,7 +820,7 @@
 
     function cellFromEvent(e) {
       const rect = boardCanvas.getBoundingClientRect();
-      const { side, cell, exercise } = geometry();
+      const { side, cell, exercise, inset } = geometry();
       const ox = (rect.width - side) / 2, oy = (rect.height - side) / 2;
       const x = e.clientX - rect.left - ox;
       const y = e.clientY - rect.top - oy;
@@ -787,10 +831,10 @@
         if (column < 0 || column >= G.SIZE || row < 0 || row >= G.SIZE) return null;
         return row * G.SIZE + column;
       }
-      const column = Math.round(x / cell);
-      const row = Math.round(y / cell);
+      const column = Math.round((x - inset) / cell);
+      const row = Math.round((y - inset) / cell);
       if (column < 0 || column >= G.SIZE || row < 0 || row >= G.SIZE) return null;
-      if (Math.abs(x - column * cell) > cell * 0.48 || Math.abs(y - row * cell) > cell * 0.48) return null;
+      if (Math.abs(x - inset - column * cell) > cell * 0.48 || Math.abs(y - inset - row * cell) > cell * 0.48) return null;
       return row * G.SIZE + column;
     }
 
@@ -810,6 +854,10 @@
       renderShopEntry();
       renderCaptionAndHint();
       boardWrap.classList.toggle("exercise", state.boardSkin === "EXERCISE");
+      boardScroller.classList.toggle("large-board", G.SIZE === 25);
+      footNote.textContent = G.SIZE === 25
+        ? "轻点交点落子 · 连成五子者胜 · 窄屏可左右滑动棋盘"
+        : "轻点交点落子 · 连成五子者胜";
       boardCanvas.classList.toggle("no-interact", !canPlay());
       undoBtn.disabled = !state.canUndo || state.aiThinking;
       draw();
@@ -867,12 +915,12 @@
       caption.textContent = state.boardSkin === "EXERCISE" ? "方格之间 · 圈勾手谈" : "手谈方圆 · 水墨木韵";
       let message;
       if (state.winner !== null || state.isDraw) message = "一局终了 · 点「↻」再来一局";
-      else if (state.aiThinking) message = "启发式 AI 正在计算最优落子…";
+      else if (state.aiThinking) message = "AI 正在思考落子…";
       else if (state.mode === "PVE") {
         const mine = state.humanColor === G.BLACK ? "执黑先行" : "执白后行";
         const theirs = state.humanColor === G.BLACK ? "执白应战" : "执黑开局";
-        const dTitle = { EASY: "简单", MEDIUM: "中等", HARD: "困难" }[state.difficulty];
-        message = "你" + mine + " · " + dTitle + "难度 AI " + theirs;
+        const dTitle = { EASY: "简单", MEDIUM: "中等", HARD: "困难", EXTREME: "超困难" }[state.difficulty];
+        message = "你" + mine + " · " + dTitle + "难度 AI " + theirs + (G.SIZE === 25 ? " · 25 路棋盘" : "");
       } else message = "黑先白后 · 任意方向连成五子即胜";
       hintPill.querySelector("span").textContent = "  " + message;
     }
@@ -894,10 +942,10 @@
       let title, message;
       if (state.isDraw && state.mode === "PVE") {
         title = "战平 AI";
-        message = "225 个交点全部落满，" + diffTitle() + "难度的 AI 也没能赢你——能与计算机战至满盘，相当了不起！";
+        message = cellCount + " 个位置全部落满，" + diffTitle() + "难度的 AI 也没能赢你——能与计算机战至满盘，相当了不起！";
       } else if (state.isDraw) {
         title = "棋逢对手";
-        message = "225 个交点全部落满，未分胜负——这一局值得回味。";
+        message = cellCount + " 个位置全部落满，未分胜负——这一局值得回味。";
       } else if (humanWon) {
         title = "漂亮，你赢了";
         message = "你执" + (blackWins ? "黑" : "白") + "连成五子，战胜了" + diffTitle() + "难度的 AI。要不要换一边再战？";
@@ -929,7 +977,7 @@
     }
 
     function diffTitle() {
-      return { EASY: "简单", MEDIUM: "中等", HARD: "困难" }[state.difficulty];
+      return { EASY: "简单", MEDIUM: "中等", HARD: "困难", EXTREME: "超困难" }[state.difficulty];
     }
 
     /* animation loop: spring + win pulse */
@@ -961,6 +1009,8 @@
       renderListeners.clear();
       resultListeners.clear();
       if (aiTimer) clearTimeout(aiTimer);
+      if (aiWorker) { aiWorker.terminate(); aiWorker = null; }
+      if (state.aiThinking) { state.aiThinking = false; state.moveId++; }
     };
   };
 
