@@ -230,6 +230,15 @@
 .gomoku-card .gc-label { font-size: 9px; letter-spacing: 1.7px; color: color-mix(in srgb, var(--turn-accent, #8A7A60) 80%, transparent); }
 .gomoku-card.moves .gc-label { color: color-mix(in srgb, var(--seal) 85%, transparent); }
 .gomoku-card .gc-value { color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gomoku-stats { margin-top: 14px; padding: 14px 16px; border: 1px solid rgba(138,122,96,.35); border-radius: 16px; background: rgba(251,246,233,.78); color: var(--ink); }
+.gomoku-stats[hidden] { display: none; }
+.gomoku-stats-title { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.gomoku-stats-title span, .gomoku-stats-note, .gomoku-stats-sides small { color: #8A7A60; font-size: 10px; font-weight: 400; }
+.gomoku-stats-sides { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; }
+.gomoku-stats-sides > div { flex: 1; min-width: 0; }
+.gomoku-stats-sides strong { display: block; font-size: 19px; margin-top: 3px; }
+.gomoku-stats-sides small { display: block; margin-top: 2px; }
+.gomoku-stats-note { margin-top: 9px; }
 .gomoku-card.moves .gc-value { font-size: 23px; }
 .thinking-dot {
   width: 7px; height: 7px; border-radius: 50%;
@@ -293,6 +302,11 @@
   background: linear-gradient(to bottom, #EFEBDF, #DFD9C6);
   border: 2px solid #FCFAF2;
   box-shadow: 0 13px 34px rgba(138, 128, 96, .45);
+}
+.gomoku-board-wrap.marble {
+  background: linear-gradient(135deg, #264c40, #729181 48%, #27463d);
+  border: 1px solid #29483d;
+  box-shadow: 0 13px 34px rgba(30, 63, 51, .32), inset 0 0 0 2px rgba(218, 202, 154, .5);
 }
 .gomoku-board-wrap canvas {
   border-radius: 18px;

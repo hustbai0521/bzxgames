@@ -12,6 +12,47 @@
   const INF = 1000000000;
   const other = p => 3 - p;
 
+  // A small opening book generated with this engine's normal 3-second search.
+  // Entries are exact 25x25 positions; rotations/reflections are equivalent.
+  // Any unrecognised opening falls through to the normal tactical search.
+  const OPENINGS = [
+    { black: [312], white: [], move: 287 },
+    { black: [312], white: [313], move: 262 },
+    { black: [312], white: [338], move: 314 },
+    { black: [312], white: [314], move: 264 },
+    { black: [312, 313], white: [287], move: 311 },
+    { black: [312, 338], white: [287], move: 286 },
+    { black: [312, 286], white: [287], move: 311 },
+    { black: [312, 262], white: [287], move: 336 },
+    { black: [312, 337], white: [287], move: 311 },
+  ];
+  function transform(cell, symmetry) {
+    let x = cell % SIZE - 12, y = ((cell / SIZE) | 0) - 12;
+    if (symmetry & 4) x = -x;
+    for (let i = 0; i < (symmetry & 3); i++) [x, y] = [-y, x];
+    return (y + 12) * SIZE + x + 12;
+  }
+  function openingMove(board, player) {
+    let black = 0, white = 0;
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] === 1) black++;
+      else if (board[i] === 2) white++;
+    }
+    if (!black && !white && player === 1) return 312;
+    for (const entry of OPENINGS) {
+      if (entry.black.length !== black || entry.white.length !== white ||
+          player !== (black === white ? 1 : 2)) continue;
+      for (let symmetry = 0; symmetry < 8; symmetry++) {
+        if (entry.black.every(cell => board[transform(cell, symmetry)] === 1) &&
+            entry.white.every(cell => board[transform(cell, symmetry)] === 2)) {
+          const move = transform(entry.move, symmetry);
+          if (!board[move]) return move;
+        }
+      }
+    }
+    return null;
+  }
+
   // Cache the 3^8 directional patterns. Center is always the new stone;
   // a pattern is independent of position, colour, and board orientation.
   const patternScore = new Int32Array(6561);
@@ -306,6 +347,10 @@
     const board = Int8Array.from(input), opts = options || {};
     const maxMs = Math.max(20, Number.isFinite(opts.maxMs) ? opts.maxMs : 3000);
     const maxDepth = Math.max(1, Math.min(10, Number.isFinite(opts.maxDepth) ? opts.maxDepth : 9));
+    if (maxMs >= 3000 && maxDepth >= 9) {
+      const bookMove = openingMove(board, player);
+      if (bookMove !== null) return bookMove;
+    }
     const context = { deadline: Date.now() + maxMs, nodes: 0, timeout: {},
       scores: [null, new Int32Array(CELLS), new Int32Array(CELLS)],
       codes: [null, new Int16Array(CELLS * 4), new Int16Array(CELLS * 4)],

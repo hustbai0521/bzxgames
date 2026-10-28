@@ -1,5 +1,5 @@
 /* Keep the expensive search off the browser's UI thread. */
-importScripts("gomoku-extreme.js?v=2");
+importScripts("gomoku-extreme.js?v=3");
 self.onmessage = function (event) {
   const request = event.data;
   try {

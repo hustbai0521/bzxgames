@@ -16,6 +16,21 @@ test('opens at the centre and does not mutate its input', () => {
   assert.deepEqual(board, position());
 });
 
+test('uses legal precomputed replies for common openings and their symmetries', () => {
+  const positions = [
+    [position([12, 12, 1]), 2, [cell(12, 11), cell(12, 13), cell(11, 12), cell(13, 12)]],
+    [position([12, 12, 1], [13, 12, 2]), 1, [cell(12, 10), cell(12, 14)]],
+    [position([12, 12, 1], [12, 13, 2]), 1, [cell(10, 12), cell(14, 12)]],
+  ];
+  for (const [board, player, expected] of positions) {
+    const before = board.slice();
+    const move = chooseMove(board, player);
+    assert.ok(expected.includes(move), `unexpected opening move ${move}`);
+    assert.equal(board[move], 0);
+    assert.deepEqual(board, before);
+  }
+});
+
 test('takes a winning move before blocking the opponent', () => {
   const board = position([3, 5, 2], [4, 5, 1], [5, 5, 1], [6, 5, 1], [7, 5, 1],
     [3, 9, 1], [4, 9, 2], [5, 9, 2], [6, 9, 2], [7, 9, 2]);

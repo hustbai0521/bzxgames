@@ -209,6 +209,29 @@
   const history = [];
   let aiTimer = null;
   let aiWorker = null;
+  // Count a finished game once; if its final move is undone and replayed,
+  // replace its result rather than counting the same game a second time.
+  let recordedResult = null;
+  const savedStats = BZX.store.get("gomokuExtremeStats", null);
+  function readSideStats(side) {
+    const value = savedStats && savedStats[side];
+    const games = value && Number.isSafeInteger(value.games) && value.games >= 0 ? value.games : 0;
+    const wins = value && Number.isSafeInteger(value.wins) && value.wins >= 0 ? Math.min(value.wins, games) : 0;
+    return { games, wins };
+  }
+  const extremeStats = { black: readSideStats("black"), white: readSideStats("white") };
+
+  function recordExtremeResult() {
+    if (state.mode !== "PVE" || state.difficulty !== "EXTREME") return;
+    const side = state.humanColor === G.BLACK ? "black" : "white";
+    const won = state.winner === state.humanColor;
+    if (recordedResult) {
+      if (recordedResult.won) extremeStats[recordedResult.side].wins--;
+    } else extremeStats[side].games++;
+    if (won) extremeStats[side].wins++;
+    recordedResult = { side, won };
+    BZX.store.set("gomokuExtremeStats", extremeStats);
+  }
 
   function resetWith(mode, difficulty, humanColor) {
     if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
@@ -216,6 +239,7 @@
     G.SIZE = 25; // 全模式统一 25 路大棋盘
     cellCount = G.SIZE * G.SIZE;
     history.length = 0;
+    recordedResult = null;
     Object.assign(state, {
       mode, difficulty, humanColor,
       board: new Array(cellCount).fill(G.EMPTY),
@@ -244,7 +268,10 @@
     state.canUndo = true;
     state.aiThinking = false;
     state.moveId++;
-    if (state.winner !== null || state.isDraw) notifyResult();
+    if (state.winner !== null || state.isDraw) {
+      recordExtremeResult();
+      notifyResult();
+    }
   }
 
   function maybeAiTurn() {
@@ -274,7 +301,7 @@
       // synchronously as a fallback, so the offline entry point still works.
       if (difficulty === "EXTREME" && typeof Worker !== "undefined") {
         try {
-          const worker = new Worker("js/gomoku-extreme-worker.js?v=2");
+          const worker = new Worker("js/gomoku-extreme-worker.js?v=3");
           aiWorker = worker;
           worker.onmessage = (event) => {
             if (aiWorker !== worker) return;
@@ -410,6 +437,8 @@
     pveInner.appendChild(sideRow);
     pveBlock.appendChild(pveInner);
     infoCol.appendChild(pveBlock);
+    const statsCard = el("div", "gomoku-stats");
+    infoCol.appendChild(statsCard);
 
     function segmentOption(row, label, caption, selected, onClick) {
       // 只负责追加一个选项；清空由调用方在重建整行时做一次
@@ -514,6 +543,7 @@
       [
         { key: "CLASSIC", title: "经典木盘", caption: "榧木棋盘 · 墨线云子" },
         { key: "EXERCISE", title: "作业本", caption: "方格纸面 · 蓝圈红勾" },
+        { key: "MARBLE", title: "翠玉琥珀", caption: "云纹石盘 · 翡翠黑子 · 琥珀白子" },
       ].forEach((skin) => {
         const option = el("button", "skin-option" + (state.boardSkin === skin.key ? " selected" : ""));
         option.appendChild(skinPreview(skin.key, 64));
@@ -589,12 +619,15 @@
       const { w, h } = s;
       ctx.clearRect(0, 0, w, h);
       const { side, cell, center, exercise, inset } = geometry();
+      const marble = state.boardSkin === "MARBLE";
       const ox = (w - side) / 2, oy = (h - side) / 2;
       ctx.save();
       ctx.translate(ox, oy);
 
       if (exercise) drawExerciseSheet(ctx, side, cell);
       else {
+        if (marble) drawMarble(ctx, side);
+        else {
         // 木纹
         for (let index = 0; index < 9; index++) {
           const grainY = side * (0.07 + index * 0.105);
@@ -618,20 +651,21 @@
         gloss.addColorStop(1, "rgba(255,255,255,.06)");
         ctx.fillStyle = gloss;
         ctx.fillRect(0, 0, side, side);
+        }
         // 墨线网格
-        ctx.strokeStyle = hexA(P.GridInk, 0.85);
+        ctx.strokeStyle = marble ? "rgba(48,76,67,.65)" : hexA(P.GridInk, 0.85);
         ctx.lineWidth = 1;
         for (let i = 0; i < G.SIZE; i++) {
           const p = inset + i * cell;
           ctx.beginPath(); ctx.moveTo(inset, p); ctx.lineTo(side - inset, p); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(p, inset); ctx.lineTo(p, side - inset); ctx.stroke();
         }
-        ctx.strokeStyle = P.GridInk;
+        ctx.strokeStyle = marble ? "#405f54" : P.GridInk;
         ctx.lineWidth = 1.7;
         ctx.strokeRect(inset, inset, side - 2 * inset, side - 2 * inset);
         const star = [4, 20, 12];
         [[star[0], star[0]], [star[0], star[1]], [star[1], star[0]], [star[1], star[1]], [star[2], star[2]]].forEach(([sx, sy]) => {
-          ctx.fillStyle = P.GridInk;
+          ctx.fillStyle = marble ? "#405f54" : P.GridInk;
           ctx.beginPath(); ctx.arc(inset + sx * cell, inset + sy * cell, 2.4, 0, Math.PI * 2); ctx.fill();
         });
       }
@@ -702,6 +736,7 @@
 
     function drawStone(ctx, c, radius, stone, exercise) {
       if (radius <= 0) return;
+      if (state.boardSkin === "MARBLE") { drawGemStone(ctx, c.x, c.y, radius, stone); return; }
       if (exercise) {
         if (stone === G.BLACK) {
           const d = radius * 1.36;
@@ -852,14 +887,30 @@
     function renderAll() {
       renderPickers();
       renderHeaderCards();
+      renderExtremeStats();
       renderShopEntry();
       renderCaptionAndHint();
       boardWrap.classList.toggle("exercise", state.boardSkin === "EXERCISE");
+      boardWrap.classList.toggle("marble", state.boardSkin === "MARBLE");
       boardScroller.classList.add("large-board");
       footNote.textContent = "轻点交点落子 · 连成五子者胜 · 窄屏可左右滑动棋盘";
       boardCanvas.classList.toggle("no-interact", !canPlay());
       undoBtn.disabled = !state.canUndo || state.aiThinking;
       draw();
+    }
+
+    function renderExtremeStats() {
+      const visible = state.mode === "PVE" && state.difficulty === "EXTREME";
+      statsCard.hidden = !visible;
+      if (!visible) return;
+      const format = (side) => side.games ? Math.round(side.wins / side.games * 100) + "%" : "—";
+      const black = extremeStats.black, white = extremeStats.white;
+      statsCard.innerHTML = '<div class="gomoku-stats-title">超困难战绩 <span>已完成 ' +
+        (black.games + white.games) + ' 局</span></div>' +
+        '<div class="gomoku-stats-sides"><div>执黑胜率 <strong>' + format(black) + '</strong><small>' +
+        black.wins + ' 胜 / ' + black.games + ' 局</small></div><div>执白胜率 <strong>' + format(white) +
+        '</strong><small>' + white.wins + ' 胜 / ' + white.games + ' 局</small></div></div>' +
+        '<div class="gomoku-stats-note">平局计入总局数 · 战绩保存在当前浏览器</div>';
     }
 
     function renderHeaderCards() {
@@ -898,20 +949,25 @@
         if (black) return '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.6" fill="none" stroke="' + P.PenBlue + '" stroke-width="2.4"/></svg>';
         return '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M3.8 12 L10.4 19.2 L21.6 4.3" fill="none" stroke="' + P.PenRed + '" stroke-width="2.4" stroke-linecap="round"/></svg>';
       }
+      if (state.boardSkin === "MARBLE" && black !== null) {
+        const color = black ? "#18765a" : "#bb7620";
+        const light = black ? "#81d6ae" : "#ffe1a0";
+        return '<div style="width:24px;height:24px;border-radius:50%;flex:0 0 24px;background:radial-gradient(circle at 32% 28%,' + light + ',' + color + ' 65%,#294036);box-shadow:0 3px 7px rgba(30,44,36,.3);"></div>';
+      }
       const base = black === null ? "#B7A98A" : black ? "#1A1E28" : "#F7F1DE";
       const rim = black === null ? "#8C7B5E" : black ? "#5E6878" : P.ClamRim;
       return '<div style="width:24px;height:24px;border-radius:50%;flex:0 0 24px;background:' + base + ";border:1px solid " + rim + ';box-shadow:0 4px 8px rgba(51,41,28,.28);"></div>';
     }
 
     function renderShopEntry() {
-      const skinTitle = state.boardSkin === "EXERCISE" ? "作业本" : "经典木盘";
+      const skinTitle = { EXERCISE: "作业本", MARBLE: "翠玉琥珀", CLASSIC: "经典木盘" }[state.boardSkin] || "经典木盘";
       shopEntry.innerHTML = "";
       shopEntry.appendChild(shopBagGlyph(15, P.Seal));
       shopEntry.appendChild(document.createTextNode("棋盘商店 · " + skinTitle));
     }
 
     function renderCaptionAndHint() {
-      caption.textContent = state.boardSkin === "EXERCISE" ? "方格之间 · 圈勾手谈" : "手谈方圆 · 水墨木韵";
+      caption.textContent = state.boardSkin === "EXERCISE" ? "方格之间 · 圈勾手谈" : state.boardSkin === "MARBLE" ? "翠作黑子 · 珀为白棋" : "手谈方圆 · 水墨木韵";
       let message;
       if (state.winner !== null || state.isDraw) message = "一局终了 · 点「↻」再来一局";
       else if (state.aiThinking) message = "AI 正在思考落子…";
@@ -1015,6 +1071,43 @@
 
   /* ---------------- helpers ---------------- */
 
+  function drawMarble(ctx, side) {
+    const base = ctx.createLinearGradient(0, 0, side, side);
+    base.addColorStop(0, "#f5f6ef"); base.addColorStop(0.52, "#e1e9e2"); base.addColorStop(1, "#f5f2e8");
+    ctx.fillStyle = base; ctx.fillRect(0, 0, side, side);
+    // Layered stone veins use fixed geometry so the texture stays still.
+    for (let i = 0; i < 8; i++) {
+      const y = side * (-0.16 + i * 0.18);
+      ctx.strokeStyle = i % 3 === 0 ? "rgba(143,156,143,.16)" : "rgba(147,167,155,.12)";
+      ctx.lineWidth = side * (i % 3 === 0 ? 0.006 : 0.003);
+      ctx.beginPath(); ctx.moveTo(-side * 0.1, y);
+      ctx.bezierCurveTo(side * 0.28, y + side * 0.19, side * 0.42, y - side * 0.08, side * 1.1, y + side * 0.23);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,.38)"; ctx.lineWidth = Math.max(.5, side * .0013);
+      ctx.beginPath(); ctx.moveTo(-side * 0.1, y + side * .008);
+      ctx.bezierCurveTo(side * 0.28, y + side * 0.198, side * 0.42, y - side * 0.072, side * 1.1, y + side * 0.238);
+      ctx.stroke();
+    }
+  }
+
+  // Black is represented by jade, white by amber; both keep distinct silhouettes.
+  function drawGemStone(ctx, x, y, r, stone) {
+    ctx.fillStyle = "rgba(30,48,40,.24)";
+    ctx.beginPath(); ctx.ellipse(x + r * .12, y + r * .20, r * .95, r * .82, 0, 0, Math.PI * 2); ctx.fill();
+    const gradient = ctx.createRadialGradient(x - r * .38, y - r * .42, r * .03, x, y, r * 1.45);
+    const colors = stone === G.BLACK ? ["#c4f4d5", "#399d71", "#086346", "#083629"] : ["#fff1be", "#e8ad46", "#b46c16", "#66360f"];
+    gradient.addColorStop(0, colors[0]); gradient.addColorStop(.35, colors[1]);
+    gradient.addColorStop(.75, colors[2]); gradient.addColorStop(1, colors[3]);
+    ctx.fillStyle = gradient;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = stone === G.BLACK ? "rgba(6,66,46,.8)" : "rgba(109,61,13,.8)";
+    ctx.lineWidth = Math.max(.6, r * .08); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.48)"; ctx.lineWidth = Math.max(.5, r * .09);
+    ctx.beginPath(); ctx.arc(x - r * .08, y - r * .08, r * .70, Math.PI * 1.12, Math.PI * 1.58); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.65)";
+    ctx.beginPath(); ctx.arc(x - r * .35, y - r * .38, r * .12, 0, Math.PI * 2); ctx.fill();
+  }
+
   function skinPreview(skin, size) {
     const canvas = el("canvas");
     const dpr = window.devicePixelRatio || 1;
@@ -1026,13 +1119,17 @@
     ctx.scale(dpr, dpr);
     const s = size;
     const exercise = skin === "EXERCISE";
-    ctx.fillStyle = exercise ? "#DFD9C6" : "#7C5527";
+    const marble = skin === "MARBLE";
+    ctx.fillStyle = exercise ? "#DFD9C6" : marble ? "#395b50" : "#7C5527";
     roundRectPath(ctx, 0, 0, s, s, 10); ctx.fill();
-    ctx.fillStyle = exercise ? "#FBF9EE" : "#DCB26A";
+    ctx.fillStyle = exercise ? "#FBF9EE" : marble ? "#e7ede5" : "#DCB26A";
     roundRectPath(ctx, 3, 3, s - 6, s - 6, 8); ctx.fill();
+    if (marble) {
+      ctx.save(); roundRectPath(ctx, 3, 3, s - 6, s - 6, 8); ctx.clip(); drawMarble(ctx, s); ctx.restore();
+    }
     const inset = s * 0.26;
     const span = s - inset * 2;
-    ctx.strokeStyle = exercise ? hexA(P.GridGreen, 0.6) : hexA(P.GridInk, 0.85);
+    ctx.strokeStyle = exercise ? hexA(P.GridGreen, 0.6) : marble ? "rgba(48,76,67,.65)" : hexA(P.GridInk, 0.85);
     ctx.lineWidth = 1;
     for (let i = 0; i < 3; i++) {
       const p = inset + (span * i) / 2;
@@ -1046,6 +1143,9 @@
       ctx.beginPath(); ctx.moveTo(inset * 0.4, 3); ctx.lineTo(inset * 0.4, s - 3); ctx.stroke();
       drawPreviewMark(ctx, inset + step * 0.5, inset + step * 0.5, step * 0.26, G.BLACK);
       drawPreviewMark(ctx, inset + step * 1.5, inset + step * 1.5, step * 0.26, G.WHITE);
+    } else if (marble) {
+      drawGemStone(ctx, inset, inset, step * .3, G.BLACK);
+      drawGemStone(ctx, inset + step, inset + step, step * .3, G.WHITE);
     } else {
       drawPreviewStone(ctx, inset, inset, step * 0.3, G.BLACK);
       drawPreviewStone(ctx, inset + step, inset + step, step * 0.3, G.WHITE);
