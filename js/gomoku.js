@@ -1092,20 +1092,37 @@
 
   // Black is represented by jade, white by amber; both keep distinct silhouettes.
   function drawGemStone(ctx, x, y, r, stone) {
-    ctx.fillStyle = "rgba(30,48,40,.24)";
-    ctx.beginPath(); ctx.ellipse(x + r * .12, y + r * .20, r * .95, r * .82, 0, 0, Math.PI * 2); ctx.fill();
-    const gradient = ctx.createRadialGradient(x - r * .38, y - r * .42, r * .03, x, y, r * 1.45);
-    const colors = stone === G.BLACK ? ["#c4f4d5", "#399d71", "#086346", "#083629"] : ["#fff1be", "#e8ad46", "#b46c16", "#66360f"];
-    gradient.addColorStop(0, colors[0]); gradient.addColorStop(.35, colors[1]);
-    gradient.addColorStop(.75, colors[2]); gradient.addColorStop(1, colors[3]);
-    ctx.fillStyle = gradient;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = stone === G.BLACK ? "rgba(6,66,46,.8)" : "rgba(109,61,13,.8)";
-    ctx.lineWidth = Math.max(.6, r * .08); ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255,.48)"; ctx.lineWidth = Math.max(.5, r * .09);
-    ctx.beginPath(); ctx.arc(x - r * .08, y - r * .08, r * .70, Math.PI * 1.12, Math.PI * 1.58); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,.65)";
-    ctx.beginPath(); ctx.arc(x - r * .35, y - r * .38, r * .12, 0, Math.PI * 2); ctx.fill();
+    const jade = stone === G.BLACK;
+    ctx.save();
+    // A soft offset shadow leaves the grid faintly visible through the stone.
+    ctx.fillStyle = jade ? "rgba(17,67,50,.12)" : "rgba(100,58,12,.13)";
+    ctx.beginPath(); ctx.ellipse(x + r * .13, y + r * .21, r * .93, r * .79, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.save(); ctx.clip();
+    const body = ctx.createRadialGradient(x - r * .33, y - r * .4, r * .04, x, y, r * 1.16);
+    const colors = jade
+      ? ["rgba(220,255,235,.65)", "rgba(83,200,148,.68)", "rgba(11,120,83,.82)", "rgba(5,72,53,.92)"]
+      : ["rgba(255,250,207,.66)", "rgba(255,196,86,.68)", "rgba(195,111,23,.82)", "rgba(122,62,11,.92)"];
+    body.addColorStop(0, colors[0]); body.addColorStop(.36, colors[1]);
+    body.addColorStop(.76, colors[2]); body.addColorStop(1, colors[3]);
+    ctx.fillStyle = body; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+    // Internal wisps and a warm translucent lower rim suggest depth.
+    ctx.strokeStyle = jade ? "rgba(218,255,226,.25)" : "rgba(255,244,195,.3)";
+    ctx.lineWidth = Math.max(.45, r * .09);
+    ctx.beginPath(); ctx.moveTo(x - r * .8, y + r * .08);
+    ctx.bezierCurveTo(x - r * .18, y - r * .18, x + r * .08, y + r * .48, x + r * .8, y + r * .04); ctx.stroke();
+    const glow = ctx.createRadialGradient(x + r * .25, y + r * .45, 0, x + r * .25, y + r * .45, r * .75);
+    glow.addColorStop(0, jade ? "rgba(172,255,209,.35)" : "rgba(255,229,138,.46)");
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+    ctx.restore();
+    ctx.strokeStyle = jade ? "rgba(9,94,67,.75)" : "rgba(142,78,15,.76)";
+    ctx.lineWidth = Math.max(.6, r * .07);
+    ctx.beginPath(); ctx.arc(x, y, r * .96, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.72)"; ctx.lineWidth = Math.max(.5, r * .09);
+    ctx.beginPath(); ctx.arc(x - r * .08, y - r * .08, r * .69, Math.PI * 1.12, Math.PI * 1.58); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.82)";
+    ctx.beginPath(); ctx.ellipse(x - r * .32, y - r * .39, r * .18, r * .10, -.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   function skinPreview(skin, size) {
