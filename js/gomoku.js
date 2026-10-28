@@ -187,7 +187,8 @@
 
   const initialMode = BZX.store.get("gomokuMode", "PVE");
   const initialDifficulty = BZX.store.get("gomokuDifficulty", "MEDIUM");
-  G.SIZE = initialMode === "PVE" && initialDifficulty === "EXTREME" ? 25 : 15;
+  // 全模式统一 25 路大棋盘
+  G.SIZE = 25;
   cellCount = G.SIZE * G.SIZE;
   const state = {
     board: new Array(cellCount).fill(G.EMPTY),
@@ -212,7 +213,7 @@
   function resetWith(mode, difficulty, humanColor) {
     if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
     if (aiWorker) { aiWorker.terminate(); aiWorker = null; }
-    G.SIZE = mode === "PVE" && difficulty === "EXTREME" ? 25 : 15;
+    G.SIZE = 25; // 全模式统一 25 路大棋盘
     cellCount = G.SIZE * G.SIZE;
     history.length = 0;
     Object.assign(state, {
@@ -450,7 +451,7 @@
           BZX.store.set("gomokuDifficulty", "HARD");
           resetWith(state.mode, "HARD", state.humanColor);
         });
-        segmentOption(diffRow, "超困难", "25 路 · 极限挑战", state.difficulty === "EXTREME", () => {
+        segmentOption(diffRow, "超困难", "极限挑战", state.difficulty === "EXTREME", () => {
           BZX.store.set("gomokuDifficulty", "EXTREME");
           resetWith(state.mode, "EXTREME", state.humanColor);
         });
@@ -573,8 +574,8 @@
     function geometry() {
       const side = Math.min(fit.state.w, fit.state.h);
       const exercise = state.boardSkin === "EXERCISE";
-      // 25 路棋盘四周留出半个棋子的空间，边缘落子也能完整显示。
-      const inset = !exercise && G.SIZE === 25 ? side / 50 : 0;
+      // 棋盘四周留出半个棋子的空间，边缘落子也能完整显示。
+      const inset = exercise ? 0 : side / 50;
       const cell = exercise ? side / G.SIZE : (side - 2 * inset) / (G.SIZE - 1);
       const center = (index) => exercise
         ? { x: ((index % G.SIZE) + 0.5) * cell, y: (Math.floor(index / G.SIZE) + 0.5) * cell }
@@ -628,7 +629,7 @@
         ctx.strokeStyle = P.GridInk;
         ctx.lineWidth = 1.7;
         ctx.strokeRect(inset, inset, side - 2 * inset, side - 2 * inset);
-        const star = G.SIZE === 25 ? [4, 20, 12] : [3, 11, 7];
+        const star = [4, 20, 12];
         [[star[0], star[0]], [star[0], star[1]], [star[1], star[0]], [star[1], star[1]], [star[2], star[2]]].forEach(([sx, sy]) => {
           ctx.fillStyle = P.GridInk;
           ctx.beginPath(); ctx.arc(inset + sx * cell, inset + sy * cell, 2.4, 0, Math.PI * 2); ctx.fill();
@@ -854,10 +855,8 @@
       renderShopEntry();
       renderCaptionAndHint();
       boardWrap.classList.toggle("exercise", state.boardSkin === "EXERCISE");
-      boardScroller.classList.toggle("large-board", G.SIZE === 25);
-      footNote.textContent = G.SIZE === 25
-        ? "轻点交点落子 · 连成五子者胜 · 窄屏可左右滑动棋盘"
-        : "轻点交点落子 · 连成五子者胜";
+      boardScroller.classList.add("large-board");
+      footNote.textContent = "轻点交点落子 · 连成五子者胜 · 窄屏可左右滑动棋盘";
       boardCanvas.classList.toggle("no-interact", !canPlay());
       undoBtn.disabled = !state.canUndo || state.aiThinking;
       draw();
@@ -920,7 +919,7 @@
         const mine = state.humanColor === G.BLACK ? "执黑先行" : "执白后行";
         const theirs = state.humanColor === G.BLACK ? "执白应战" : "执黑开局";
         const dTitle = { EASY: "简单", MEDIUM: "中等", HARD: "困难", EXTREME: "超困难" }[state.difficulty];
-        message = "你" + mine + " · " + dTitle + "难度 AI " + theirs + (G.SIZE === 25 ? " · 25 路棋盘" : "");
+        message = "你" + mine + " · " + dTitle + "难度 AI " + theirs + " · 25 路棋盘";
       } else message = "黑先白后 · 任意方向连成五子即胜";
       hintPill.querySelector("span").textContent = "  " + message;
     }
@@ -1113,4 +1112,14 @@
     s.style.height = h + "px";
     return s;
   }
+
+  // 测试钩子：Node/e2e 直接驱动引擎（读取状态、同步计算 AI 落子）
+  BZX.__gomokuEngine = {
+    state,
+    bestMove,
+    play,
+    undo,
+    resetWith,
+    size: () => G.SIZE,
+  };
 })();
