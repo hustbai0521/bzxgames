@@ -9,7 +9,7 @@
   position: absolute; inset: 0;
   overflow: hidden;
 }
-.game-screen .backdrop-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.game-screen .backdrop-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .game-screen .glow-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* NEON theme */
