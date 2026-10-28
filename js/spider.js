@@ -362,14 +362,15 @@
       // 新牌的弹跳动画由发牌流程统一控制（落地时加一次），这里不再自动加，避免重渲染时反复闪
       if (opts.selected) node.classList.add("selected-run");
       if (opts.lifted) node.classList.add("drag-lifted");
-      node.innerHTML = cardFaceHTML(card);
-      if (opts.interactive) {
+      // 暗牌渲染牌背（与牌堆/飞牌同一套牌背纹样），不可点选不可拖
+      node.innerHTML = card.faceUp ? cardFaceHTML(card) : cardBackHTML();
+      if (opts.interactive && card.faceUp) {
         node.classList.add("clickable");
         node.addEventListener("click", () => {
           if (performance.now() - lastDragEndTime < 150) return; // 拖拽松手后的 click 不再触发点选
           sfxTap();
           tapCard(column, row);
-          renderBoard();
+          renderAll(); // 走 renderAll:凑齐第八组连珠时也要触发胜利弹窗
         });
         attachDrag(node, column, row);
       }
@@ -411,7 +412,7 @@
         colEl.appendChild(empty);
         colEl.addEventListener("click", () => {
           if (performance.now() - lastDragEndTime < 150) return;
-          if (tapColumn(column)) { sfxTap(); renderBoard(); }
+          if (tapColumn(column)) { sfxTap(); renderAll(); }
         });
 
         let y = 0;
@@ -565,7 +566,7 @@
               if (dealing) {
                 dealing = null;
                 dealtPopSerial = state.game.serial; // 本局新牌已弹过，后续重渲染不再闪
-                renderBoard();
+                renderAll(); // 发牌也可能凑齐最后一组连珠
               }
             }, 200);
           }
@@ -583,6 +584,7 @@
     function attachDrag(node, column, row) {
       node.addEventListener("pointerdown", (e) => {
         if (state.game.status === "WON") return;
+        if (dealing) return; // 发牌动画进行中，与顶栏/牌堆入口同样禁止操作
         if (e.button !== 0 && e.pointerType === "mouse") return;
         if (!movableRun(state.game.columns[column], row)) return;
         // 上一次会话若未正常收尾（如在窗外松开鼠标、第二根手指按下），先清掉残影
@@ -699,13 +701,14 @@
       } else {
         clearSelection();
       }
-      renderBoard();
+      renderAll(); // 拖拽落牌同样可能触发胜利弹窗
     }
 
     /* ---------------- win overlay ---------------- */
 
     function maybeWin() {
       if (state.game.status !== "WON") return;
+      if (root.querySelector(".win-overlay")) return; // 胜利弹窗每局只弹一次(重渲染/悬停不会重复弹)
       const overlay = el("div", "win-overlay");
       const cv = el("canvas");
       overlay.appendChild(cv);
@@ -882,24 +885,24 @@
       }
     }
 
-    function cardBack(width) {
-      const node = el("div");
-      node.style.cssText =
-        "width:" + width + "px;height:" + (width * 1.4) + "px;border-radius:3px;background:" + COLORS.backBlue +
-        ";box-shadow:0 1px 3px rgba(0,0,0,.3);position:relative;overflow:hidden;";
-      const frame = el("div");
-      frame.style.cssText =
-        "position:absolute;inset:2px;border:1.1px solid #fff;border-radius:2px;overflow:hidden;";
-      // 斜向格纹
-      const lattice = el("div");
-      lattice.style.cssText =
-        "position:absolute;inset:0;background:repeating-linear-gradient(45deg," +
-        hexA(COLORS.backLattice, 0.55) + " 0 1px, transparent 1px 5.5px)," +
-        "repeating-linear-gradient(-45deg," + hexA(COLORS.backLattice, 0.55) + " 0 1px, transparent 1px 5.5px);";
-      frame.appendChild(lattice);
-      node.appendChild(frame);
-      return node;
-    }
+  function cardBack(width) {
+    const node = el("div");
+    node.style.cssText =
+      "width:" + width + "px;height:" + (width * 1.4) + "px;border-radius:3px;" +
+      "box-shadow:0 1px 3px rgba(0,0,0,.3);position:relative;overflow:hidden;";
+    node.innerHTML = cardBackHTML();
+    return node;
+  }
+
+  // 牌背纹样（列内暗牌 / 牌堆 / 发牌飞牌共用）
+  function cardBackHTML() {
+    return '<div style="position:absolute;inset:0;background:' + COLORS.backBlue + ';overflow:hidden;">' +
+      '<div style="position:absolute;inset:2px;border:1.1px solid #fff;border-radius:2px;overflow:hidden;">' +
+      '<div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,' +
+      hexA(COLORS.backLattice, 0.55) + " 0 1px, transparent 1px 5.5px)," +
+      "repeating-linear-gradient(-45deg," + hexA(COLORS.backLattice, 0.55) + " 0 1px, transparent 1px 5.5px);\"></div>" +
+      "</div></div>";
+  }
 
     function renderAll() {
       renderBoard();
