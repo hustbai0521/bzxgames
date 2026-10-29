@@ -57,10 +57,9 @@ function openings(count, seedArg) {
 if (!isMainThread) {
   const { chooseMove } = require(workerData.engine);
   const { bestMove } = require(workerData.baseline);
-  parentPort.on('message', ({ game, opening, maxMs }) => {
+  parentPort.on('message', ({ game, opening, maxMs, extreme }) => {
     const board = Array(cells).fill(0), moves = opening.slice();
     opening.forEach((cell, i) => { board[cell] = i % 2 + 1; });
-    const extreme = 2;
     const started = Date.now(); let result = 0;
     for (let turn = opening.length; turn < cells; turn++) {
       const player = turn % 2 + 1;
@@ -74,16 +73,17 @@ if (!isMainThread) {
 } else {
   const games = Number(process.argv[2] || 40), maxMs = Number(process.argv[3] || 3000), concurrency = Number(process.argv[4] || 4);
   const seed = process.argv[6] ? Number(process.argv[6]) : 0x1e775eed;
+  const extreme = Number(process.argv[7]) === 1 ? 1 : 2;
   if (!Number.isInteger(games) || games < 1 || !Number.isInteger(concurrency) || concurrency < 1 || !Number.isFinite(maxMs) || maxMs < 20) throw new Error('Use a game count, positive concurrency, and >=20ms budget');
-  const dir = path.resolve('benchmark-results', `gomoku-white-${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`);
+  const dir = path.resolve('benchmark-results', `gomoku-${extreme === 1 ? 'black' : 'white'}-${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`);
   fs.mkdirSync(dir, { recursive: true });
   const engine = path.join(dir, 'gomoku-extreme.snapshot.cjs'), baseline = path.join(dir, 'gomoku-hard.snapshot.cjs');
   fs.copyFileSync(path.resolve(process.argv[5] || 'js/gomoku-extreme.js'), engine);
   fs.copyFileSync(path.resolve('tests/gomoku-hard-baseline.cjs'), baseline);
   fs.copyFileSync(__filename, path.join(dir, 'benchmark.snapshot.cjs'));
   const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const generated = openings(games, seed), jobs = generated.map((opening, i) => ({ game: i + 1, opening, maxMs }));
-  const metadata = { games, maxMs, concurrency, whiteOnly: true, seed: '0x' + (seed >>> 0).toString(16), openingDescription: `${games} dihedrally unique, randomly forced four-ply openings near centre; engine always white`, engineSHA256: hash(engine), baselineSHA256: hash(baseline), benchmarkSHA256: hash(path.join(dir, 'benchmark.snapshot.cjs')), cpu: os.cpus()[0].model, logicalCPUs: os.cpus().length, started: new Date().toISOString() };
+  const generated = openings(games, seed), jobs = generated.map((opening, i) => ({ game: i + 1, opening, maxMs, extreme }));
+  const metadata = { games, maxMs, concurrency, whiteOnly: extreme === 2, extreme, seed: '0x' + (seed >>> 0).toString(16), openingDescription: `${games} dihedrally unique, randomly forced four-ply openings near centre; engine always ${extreme === 1 ? 'black' : 'white'}`, engineSHA256: hash(engine), baselineSHA256: hash(baseline), benchmarkSHA256: hash(path.join(dir, 'benchmark.snapshot.cjs')), cpu: os.cpus()[0].model, logicalCPUs: os.cpus().length, started: new Date().toISOString() };
   fs.writeFileSync(path.join(dir, 'metadata.json'), JSON.stringify(metadata, null, 2));
   fs.writeFileSync(path.join(dir, 'games.jsonl'), '');
   console.log(JSON.stringify({ directory: dir, ...metadata }));
