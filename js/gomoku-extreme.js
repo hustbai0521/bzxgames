@@ -614,7 +614,10 @@
   function chooseMove(input, player, options) {
     if (!input || input.length !== CELLS || (player !== 1 && player !== 2)) throw new Error("Expected a 25x25 board and player 1 or 2");
     const board = Int8Array.from(input), opts = options || {};
-    const maxMs = Math.max(20, Number.isFinite(opts.maxMs) ? opts.maxMs : 3000);
+    // Super-hard ships with a 6-second budget: the Set C benchmark measured
+    // roughly +5 points of white win rate from the extra thinking time
+    // (65.0% at 3s -> 70.0% at 6s) on the unchanged search geometry.
+    const maxMs = Math.max(20, Number.isFinite(opts.maxMs) ? opts.maxMs : 6000);
     const maxDepth = Math.max(1, Math.min(12, Number.isFinite(opts.maxDepth) ? opts.maxDepth : 12));
     const startedAt = Date.now();
     if (maxMs >= 3000 && maxDepth >= 9) {
