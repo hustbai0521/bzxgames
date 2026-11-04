@@ -1,0 +1,22 @@
+{
+  "games": 120,
+  "maxMs": 6000,
+  "concurrency": 4,
+  "fresh": true,
+  "whiteOnly": true,
+  "extreme": 2,
+  "seed": "0x67932",
+  "openingDescription": "120 dihedrally unique, randomly forced four-ply openings near centre; engine always white",
+  "engineSHA256": "3c8fdf60a592c9bc2994ce96baef891d84b8447455343ee85b8d7155cdd1e6fe",
+  "baselineSHA256": "6fa717f5d89817794de00723b8714dda90c5a59db80f06b0f1e28d81fd321d5a",
+  "benchmarkSHA256": "f5851382a78f729d0113dc9735531f0f5292342f5a90ac95072bd99f6fbe3743",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13650HX",
+  "logicalCPUs": 20,
+  "started": "2026-11-04T07:56:35.052Z",
+  "completed": "2026-11-04T08:27:31.917Z",
+  "elapsedMs": 1856865,
+  "engineWins": 90,
+  "hardWins": 30,
+  "draws": 0,
+  "engineWhiteWinRate": 0.75
+}

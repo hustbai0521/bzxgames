@@ -121,9 +121,14 @@
 
   const lines = new Int16Array(CELLS * 32);
   const affected = Array.from({ length: CELLS }, () => []);
+  const neighbours = Array.from({ length: CELLS }, () => []);
   const pow3 = [1,3,9,27,81,243,729,2187];
   for (let cell = 0; cell < CELLS; cell++) {
     const x = cell % SIZE, y = (cell / SIZE) | 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && xx < SIZE && yy >= 0 && yy < SIZE) neighbours[cell].push(yy * SIZE + xx);
+    }
     let n = cell * 32;
     for (let dir=0;dir<4;dir++) { const [dx,dy] = DIRS[dir]; for (let t = -4; t <= 4; t++) {
       if (!t) continue;
@@ -202,11 +207,25 @@
   }
   function setStone(board, cell, value, context) {
     const old = board[cell];
-    if (!old && value) updateNear(context, cell, 1);
-    else if (old && !value) updateNear(context, cell, -1);
+    const change = !old && value ? 1 : old && !value ? -1 : 0;
     toggleHash(context, cell, old);
     toggleHash(context, cell, value);
     board[cell] = value;
+    if (change) {
+      context.stones += change;
+      const list = context.candList, pos = context.candPos;
+      for (const n of neighbours[cell]) {
+        context.near[n] += change;
+        if (!list) continue;
+        const wanted = !board[n] && context.near[n] > 0;
+        const at = pos[n];
+        if (wanted && at < 0) { pos[n] = context.candCount; list[context.candCount++] = n; }
+        else if (!wanted && at >= 0) {
+          const last = list[--context.candCount];
+          list[at] = last; pos[last] = at; pos[n] = -1;
+        }
+      }
+    }
     for (const [i, dir, power] of affected[cell]) {
       for (let player = 1; player <= 2; player++) {
         const from = !old ? 0 : old === player ? 1 : 2;
@@ -215,7 +234,6 @@
         context.scores[player][i] = scoreCodes(context.codes[player], i);
       }
     }
-    if (context.candList) updateCandidates(board, context, cell);
   }
 
   // Keep the frontier as an unordered pool alongside the near[] counts. Only
@@ -495,9 +513,13 @@
   function search(board, player, depth, alpha, beta, ply, context, extensions) {
     if (++context.nodes % 32 === 0 && Date.now() >= context.deadline) throw context.timeout;
     const index = (context.hash1 ^ Math.imul(context.hash2, 0x9e3779b1)) & TT_MASK;
-    const depthExt = (depth << 3) | (extensions << 8);
+    // Forced continuations may descend below depth zero. Encode depth and
+    // extension count in separate fields, including the side to move.
+    const depthExt = ((depth + 1024) << 3) | (extensions << 17) | (player << 19);
     const oldMeta = ttMeta[index];
-    if (oldMeta && ttLock[index] === context.hash2 && (oldMeta & ~7) === depthExt) {
+    const matched = oldMeta && ttLock[index] === context.hash2 && ((oldMeta >>> 19) & 3) === player;
+    const cachedMove = matched ? ttMove[index] : 0;
+    if (matched && (oldMeta & ~7) === depthExt) {
       const score = ttScore[index], kind = oldMeta & 7;
       if (kind === 3) return score;
       if (kind === 2) { if (score > alpha) alpha = score; }
@@ -532,7 +554,9 @@
       listCells = data.theirWins; listN = 1;
     } else {
       // Narrow deeper nodes while preserving every forcing four.
-      const width = ply <= 1 ? 10 : ply <= 3 ? 7 : 5;
+      // The wider interior profile was stronger in the recorded six-second
+      // tests; re-evaluate it against the current engine's browser lifecycle.
+      const width = ply <= 1 ? 12 : ply <= 3 ? 8 : 6;
       if (data.nForcing > width) { listCells = data.forceC; listN = Math.min(data.forceSize, FORCE_CAP); }
       else { listCells = data.mainC; listN = Math.min(data.mainSize, width); }
     }
@@ -545,7 +569,7 @@
     // reduced by one ply first and re-searched in full when the reduction
     // might have hidden something better.
     if (canKill) {
-      const tc = ttMove[index];
+      const tc = cachedMove;
       if (tc > 0 && !board[tc] && context.near[tc]) {
         setStone(board, tc, player, context);
         let value;
@@ -565,7 +589,7 @@
     }
     if (canKill) for (let k = 0; k < 2 && !cut; k++) {
       const kc = killers[ply * 2 + k];
-      if (!kc || board[kc] || !context.near[kc] || kc === ttMove[index] ||
+      if (!kc || board[kc] || !context.near[kc] || kc === cachedMove ||
           context.scores[other(player)][kc] >= WIN) continue;
       setStone(board, kc, player, context);
       let value;
@@ -585,7 +609,7 @@
     }
     for (let i = 0; i < listN && !cut; i++) {
       const cell = listCells[i];
-      if (canKill && (cell === ttMove[index] || cell === killers[ply * 2] || cell === killers[ply * 2 + 1])) continue;
+      if (canKill && (cell === cachedMove || cell === killers[ply * 2] || cell === killers[ply * 2 + 1])) continue;
       setStone(board, cell, player, context);
       let value;
       try {
@@ -602,7 +626,7 @@
       if (value > alpha) alpha = value;
       if (alpha >= beta) { cut = true; bestCell = cell; }
     }
-    if (!oldMeta || (oldMeta & ~7) === depthExt || depth >= ((oldMeta >> 3) & 31)) {
+    if (!oldMeta || !matched || (oldMeta & ~7) === depthExt || depth >= (((oldMeta >>> 3) & 0x3fff) - 1024)) {
       ttLock[index] = context.hash2;
       ttMeta[index] = (best <= initialAlpha ? 1 : best >= initialBeta ? 2 : 3) | depthExt;
       ttScore[index] = best;
@@ -624,6 +648,10 @@
       const bookMove = openingMove(board, player);
       if (bookMove !== null) return bookMove;
     }
+    // Mate scores depend on distance from the root. Do not reuse scores or
+    // killer hints from a previous turn with a different root position.
+    ttMeta.fill(0);
+    killers.fill(0);
     const context = { deadline: startedAt + maxMs, nodes: 0, timeout: {},
       scores: [null, new Int32Array(CELLS), new Int32Array(CELLS)],
       codes: [null, new Int16Array(CELLS * 4), new Int16Array(CELLS * 4)],
@@ -651,7 +679,7 @@
     const forcedWin = data.list.find(move => move.attack >= FORCED_WIN);
     if (forcedWin) return forcedWin.cell;
     let best = data.list[0].cell;
-    const rootMoves = data.list.slice(0, 24);
+    const rootMoves = data.list.slice(0, 16);
     let depthReached = 0;
     for (let depth = 1; depth <= maxDepth; depth++) {
       let iterationBest = best, iterationScore = -INF, alpha = -INF;

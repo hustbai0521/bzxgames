@@ -301,7 +301,7 @@
       // synchronously as a fallback, so the offline entry point still works.
       if (difficulty === "EXTREME" && typeof Worker !== "undefined") {
         try {
-          const worker = new Worker("js/gomoku-extreme-worker.js?v=3");
+          const worker = new Worker("js/gomoku-extreme-worker.js?v=6");
           aiWorker = worker;
           worker.onmessage = (event) => {
             if (aiWorker !== worker) return;
@@ -480,7 +480,7 @@
           BZX.store.set("gomokuDifficulty", "HARD");
           resetWith(state.mode, "HARD", state.humanColor);
         });
-        segmentOption(diffRow, "超困难", "极限挑战", state.difficulty === "EXTREME", () => {
+        segmentOption(diffRow, "超困难", "第六代引擎", state.difficulty === "EXTREME", () => {
           BZX.store.set("gomokuDifficulty", "EXTREME");
           resetWith(state.mode, "EXTREME", state.humanColor);
         });
@@ -905,7 +905,7 @@
       if (!visible) return;
       const format = (side) => side.games ? Math.round(side.wins / side.games * 100) + "%" : "—";
       const black = extremeStats.black, white = extremeStats.white;
-      statsCard.innerHTML = '<div class="gomoku-stats-title">超困难战绩 <span>已完成 ' +
+      statsCard.innerHTML = '<div class="gomoku-stats-title">超困难战绩 · 第六代引擎 <span>已完成 ' +
         (black.games + white.games) + ' 局</span></div>' +
         '<div class="gomoku-stats-sides"><div>执黑胜率 <strong>' + format(black) + '</strong><small>' +
         black.wins + ' 胜 / ' + black.games + ' 局</small></div><div>执白胜率 <strong>' + format(white) +

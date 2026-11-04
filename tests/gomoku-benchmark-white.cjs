@@ -55,7 +55,7 @@ function openings(count, seedArg) {
   return result;
 }
 if (!isMainThread) {
-  const { chooseMove } = require(workerData.engine);
+  const initialEngine = workerData.fresh ? null : require(workerData.engine);
   const { bestMove } = require(workerData.baseline);
   parentPort.on('message', ({ game, opening, maxMs, extreme }) => {
     const board = Array(cells).fill(0), moves = opening.slice();
@@ -63,7 +63,22 @@ if (!isMainThread) {
     const started = Date.now(); let result = 0;
     for (let turn = opening.length; turn < cells; turn++) {
       const player = turn % 2 + 1;
-      const move = player === extreme ? chooseMove(board, player, { maxMs }) : bestMove(board, player, 'HARD');
+      let move;
+      if (player === extreme) {
+        // The browser starts a fresh worker for every AI move. Re-importing the
+        // engine here reproduces that cache lifetime when --fresh is selected.
+        if (workerData.fresh) {
+          const id = require.resolve(workerData.engine);
+          delete require.cache[id];
+          // Node also retains required modules in the parent module's children.
+          // Remove that reference so large transposition tables can be collected.
+          for (let i = module.children.length - 1; i >= 0; i--) {
+            if (module.children[i].id === id) module.children.splice(i, 1);
+          }
+        }
+        const engine = workerData.fresh ? require(workerData.engine) : initialEngine;
+        move = engine.chooseMove(board, player, { maxMs });
+      } else move = bestMove(board, player, 'HARD');
       if (!Number.isInteger(move) || move < 0 || move >= cells || board[move]) throw new Error(`Illegal move ${move} in game ${game}`);
       board[move] = player; moves.push(move);
       if (won(board, move, player)) { result = player; break; }
@@ -74,6 +89,7 @@ if (!isMainThread) {
   const games = Number(process.argv[2] || 40), maxMs = Number(process.argv[3] || 3000), concurrency = Number(process.argv[4] || 4);
   const seed = process.argv[6] ? Number(process.argv[6]) : 0x1e775eed;
   const extreme = Number(process.argv[7]) === 1 ? 1 : 2;
+  const fresh = process.argv[8] === '--fresh';
   if (!Number.isInteger(games) || games < 1 || !Number.isInteger(concurrency) || concurrency < 1 || !Number.isFinite(maxMs) || maxMs < 20) throw new Error('Use a game count, positive concurrency, and >=20ms budget');
   const dir = path.resolve('benchmark-results', `gomoku-${extreme === 1 ? 'black' : 'white'}-${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`);
   fs.mkdirSync(dir, { recursive: true });
@@ -83,7 +99,7 @@ if (!isMainThread) {
   fs.copyFileSync(__filename, path.join(dir, 'benchmark.snapshot.cjs'));
   const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   const generated = openings(games, seed), jobs = generated.map((opening, i) => ({ game: i + 1, opening, maxMs, extreme }));
-  const metadata = { games, maxMs, concurrency, whiteOnly: extreme === 2, extreme, seed: '0x' + (seed >>> 0).toString(16), openingDescription: `${games} dihedrally unique, randomly forced four-ply openings near centre; engine always ${extreme === 1 ? 'black' : 'white'}`, engineSHA256: hash(engine), baselineSHA256: hash(baseline), benchmarkSHA256: hash(path.join(dir, 'benchmark.snapshot.cjs')), cpu: os.cpus()[0].model, logicalCPUs: os.cpus().length, started: new Date().toISOString() };
+  const metadata = { games, maxMs, concurrency, fresh, whiteOnly: extreme === 2, extreme, seed: '0x' + (seed >>> 0).toString(16), openingDescription: `${games} dihedrally unique, randomly forced four-ply openings near centre; engine always ${extreme === 1 ? 'black' : 'white'}`, engineSHA256: hash(engine), baselineSHA256: hash(baseline), benchmarkSHA256: hash(path.join(dir, 'benchmark.snapshot.cjs')), cpu: os.cpus()[0].model, logicalCPUs: os.cpus().length, started: new Date().toISOString() };
   fs.writeFileSync(path.join(dir, 'metadata.json'), JSON.stringify(metadata, null, 2));
   fs.writeFileSync(path.join(dir, 'games.jsonl'), '');
   console.log(JSON.stringify({ directory: dir, ...metadata }));
@@ -93,7 +109,7 @@ if (!isMainThread) {
     else worker.terminate();
   }
   for (let i = 0; i < Math.min(concurrency, games); i++) {
-    const worker = new Worker(__filename, { workerData: { engine, baseline } });
+    const worker = new Worker(__filename, { workerData: { engine, baseline, fresh } });
     worker.on('message', game => {
       fs.appendFileSync(path.join(dir, 'games.jsonl'), JSON.stringify(game) + '\n');
       done++;
