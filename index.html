@@ -2,6 +2,12 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<script>
+// Keep links to the public site on HTTPS without affecting local development.
+if (location.protocol === "http:" && location.hostname === "hustrc.me") {
+  location.replace("https://" + location.hostname + location.pathname + location.search + location.hash);
+}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>BZX / 小游戏合集</title>
 <link rel="stylesheet" href="css/base.css?v=23">
