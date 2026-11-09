@@ -1,0 +1,81 @@
+/* 书页之间：让背景成为氛围，练习内容始终有清晰的阅读底色。 */
+.typing-screen {
+  --typing-ink: #263e3c;
+  --typing-muted: #71827c;
+  --typing-accent: #49786d;
+  --typing-paper: rgba(250, 250, 244, .96);
+  background: #d4e0d8 url('../assets/typing-zh.webp') center / cover no-repeat;
+  color: var(--typing-ink);
+  overflow: hidden;
+}
+.typing-screen[data-language="en"] {
+  --typing-ink: #473b34;
+  --typing-muted: #827569;
+  --typing-accent: #916f52;
+  --typing-paper: rgba(251, 248, 240, .96);
+  background-color: #d6c7ae;
+  background-image: url('../assets/typing-en.webp');
+}
+.typing-screen::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(17, 35, 35, .26), rgba(29, 47, 44, .08) 36%, rgba(20, 39, 37, .3)); pointer-events: none; }
+.typing-page { position: relative; width: min(100%, 1050px); height: 100%; margin: auto; padding: 18px 30px 30px; overflow-y: auto; scrollbar-width: thin; }
+.typing-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; color: white; text-shadow: 0 1px 8px rgba(0,0,0,.3); }
+.typing-back { padding: 10px 0; font-size: 13px; font-weight: 600; }
+.typing-back:hover { opacity: .72; }
+.typing-brand { font-size: 10px; font-weight: 700; letter-spacing: .18em; white-space: nowrap; }
+.typing-intro { padding: 26px 3px 24px; color: #fff; text-shadow: 0 2px 18px rgba(25, 38, 34, .45); }
+.typing-eyebrow { font-size: 12px; letter-spacing: .2em; }
+.typing-title { margin: 7px 0; font-family: "Noto Serif SC", "Songti SC", SimSun, serif; font-weight: 500; letter-spacing: .12em; font-size: clamp(32px, 5vw, 48px); line-height: 1.15; }
+.typing-subtitle { font-size: 13px; letter-spacing: .08em; opacity: .92; }
+.typing-panel { padding: 26px 32px 25px; background: var(--typing-paper); border: 1px solid rgba(255,255,255,.78); border-radius: 22px; box-shadow: 0 18px 70px rgba(25, 42, 40, .19); }
+.typing-toolbar { display: flex; gap: 20px; align-items: end; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid rgba(100, 119, 108, .16); }
+.typing-modes { display: inline-flex; gap: 3px; padding: 4px; border-radius: 10px; background: rgba(78, 106, 96, .09); flex: none; }
+.typing-mode { min-width: 98px; padding: 9px 15px; border-radius: 7px; color: var(--typing-muted); font-size: 13px; font-weight: 650; }
+.typing-mode.active { background: #fff; color: var(--typing-ink); box-shadow: 0 2px 8px rgba(47, 57, 49, .08); }
+.typing-selection { display: flex; flex-direction: column; gap: 6px; width: min(100%, 330px); }
+.typing-select-label, .typing-section-label { color: var(--typing-muted); font-size: 11px; font-weight: 700; letter-spacing: .09em; }
+.typing-select { width: 100%; min-height: 40px; padding: 8px 32px 8px 12px; border: 1px solid rgba(105, 125, 115, .24); border-radius: 8px; background: rgba(255,255,255,.65); color: var(--typing-ink); font: inherit; font-size: 13px; }
+.typing-work-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 23px 0 20px; }
+.typing-work-kicker { color: var(--typing-accent); font-size: 10px; font-weight: 700; letter-spacing: .13em; }
+.typing-work-title { margin: 6px 0 3px; font-family: "Noto Serif SC", "Songti SC", SimSun, Georgia, serif; font-size: 25px; font-weight: 600; line-height: 1.3; }
+.typing-work-author { color: var(--typing-muted); font-size: 12px; }
+.typing-restart { flex: none; padding: 9px 13px; border: 1px solid rgba(105,125,115,.27); border-radius: 8px; color: var(--typing-ink); font-size: 12px; }
+.typing-restart:hover { background: rgba(100, 125, 110, .09); }
+.typing-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.typing-metric { min-width: 0; padding: 12px 15px; border-radius: 10px; background: rgba(96, 125, 109, .065); }
+.typing-metric-label { color: var(--typing-muted); font-size: 11px; }
+.typing-metric-value { margin-top: 3px; color: var(--typing-ink); font-size: clamp(16px, 2.5vw, 22px); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.typing-progress-row { display: flex; justify-content: space-between; margin-top: 18px; color: var(--typing-muted); font-size: 11px; }
+.typing-progress-text { font-variant-numeric: tabular-nums; }
+.typing-progress-track { height: 5px; margin: 8px 0 22px; border-radius: 5px; background: rgba(92, 115, 102, .13); overflow: hidden; }
+.typing-progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--typing-accent); transition: width .18s; }
+.typing-reading { position: relative; height: 150px; overflow-y: auto; margin-top: 9px; padding: 18px 20px; border: 1px solid rgba(110, 125, 113, .14); border-radius: 11px; background: rgba(255,255,255,.56); color: #849089; font-family: "Noto Serif SC", "Songti SC", SimSun, Georgia, serif; font-size: 18px; line-height: 2; letter-spacing: .045em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.typing-screen[data-language="en"] .typing-reading { font-family: Georgia, "Times New Roman", serif; letter-spacing: .015em; line-height: 1.9; }
+.typing-correct { color: var(--typing-ink); }
+.typing-error { color: #a53f39; background: rgba(190, 80, 70, .12); text-decoration: underline; text-decoration-color: #bc6860; text-underline-offset: 4px; }
+.typing-current { background: rgba(87, 132, 112, .16); box-shadow: inset 2px 0 var(--typing-accent); }
+.typing-input-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 19px 0 9px; }
+.typing-input-hint { color: var(--typing-muted); font-size: 11px; }
+.typing-input { display: block; width: 100%; min-height: 108px; resize: vertical; padding: 14px 17px; border: 1px solid rgba(93, 123, 106, .25); border-radius: 10px; outline: none; background: rgba(255,255,255,.82); color: var(--typing-ink); font-family: inherit; font-size: 16px; line-height: 1.8; }
+.typing-input:focus { border-color: var(--typing-accent); box-shadow: 0 0 0 3px rgba(90, 128, 106, .13); }
+.typing-input::placeholder { color: #a6afa8; }
+.typing-input:read-only { background: rgba(239, 243, 236, .8); }
+.typing-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 11px; font-size: 11px; line-height: 1.6; }
+.typing-help { color: var(--typing-muted); }
+.typing-status { color: var(--typing-accent); font-weight: 700; }
+.typing-note { margin: 14px 3px 0; color: white; font-size: 11px; line-height: 1.6; text-shadow: 0 1px 5px rgba(0,0,0,.65); }
+@media (max-width: 600px) {
+  .typing-page { padding: 12px 15px 25px; }
+  .typing-brand { font-size: 9px; letter-spacing: .1em; }
+  .typing-intro { padding: 17px 3px 19px; }
+  .typing-title { font-size: 34px; }
+  .typing-panel { padding: 19px 17px 20px; border-radius: 17px; }
+  .typing-toolbar { align-items: stretch; flex-direction: column; gap: 15px; padding-bottom: 18px; }
+  .typing-modes { align-self: flex-start; }
+  .typing-selection { width: 100%; }
+  .typing-work-heading { margin: 19px 0 15px; }
+  .typing-work-title { font-size: 21px; }
+  .typing-metric { padding: 10px 7px; }
+  .typing-metric-value { font-size: 14px; }
+  .typing-reading { height: 140px; padding: 13px 14px; font-size: 16px; }
+  .typing-input-hint { font-size: 10px; }
+}

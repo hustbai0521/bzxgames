@@ -341,6 +341,7 @@
     link: { title: "连连看 · BZX 小游戏合集", mount: (root) => BZX.LinkScreen(root) },
     sudoku: { title: "数独 · BZX 小游戏合集", mount: (root) => BZX.SudokuScreen(root) },
     spider: { title: "蜘蛛纸牌 · BZX 小游戏合集", mount: (root) => BZX.SpiderScreen(root) },
+    typing: { title: "打字练习 · BZX 小游戏合集", mount: (root) => BZX.TypingScreen(root) },
   };
 
   const router = {

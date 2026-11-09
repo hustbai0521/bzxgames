@@ -74,7 +74,7 @@
     /* ---------- 下一站，小惊喜 ---------- */
     const upHeader = el("div", "upcoming-header");
     upHeader.appendChild(el("div", "uh-title", "下一站，小惊喜"));
-    upHeader.appendChild(el("div", "uh-sub", "6 款全上线"));
+    upHeader.appendChild(el("div", "uh-sub", "7 款全上线"));
     section.appendChild(upHeader);
 
     const games = [
@@ -84,6 +84,7 @@
       { name: "蜘蛛纸牌", subtitle: "理好每一手牌", icon: 3, route: "spider" },
       { name: "扫雷", subtitle: "每一步都是灵感", icon: 4, route: "mines" },
       { name: "数独", subtitle: "静下心来的推演", icon: 5, route: "sudoku" },
+      { name: "打字练习", subtitle: "在文字里慢慢前行", icon: 6, route: "typing" },
     ];
     const grid = el("div", "upcoming-grid");
     for (let i = 0; i < games.length; i += 2) {
@@ -360,6 +361,20 @@
       ctx.fillStyle = hexA(C.SeaGlass, 0.4);
       ctx.beginPath(); ctx.arc(w * (0.08 + 0.14), h * (0.08 + 0.14), w * 0.055, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(w * (0.92 - 0.14), h * (0.92 - 0.14), w * 0.055, 0, Math.PI * 2); ctx.fill();
+    } else if (kind === 6) { // 打字练习：键盘
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, w * 0.06, h * 0.2, w * 0.88, h * 0.6, 3);
+      ctx.stroke();
+      ctx.fillStyle = ink;
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 4; col++) {
+          roundRect(ctx, w * (0.16 + col * 0.19), h * (0.31 + row * 0.16), w * 0.09, h * 0.07, 1);
+          ctx.fill();
+        }
+      }
+      roundRect(ctx, w * 0.3, h * 0.66, w * 0.4, h * 0.06, 1);
+      ctx.fill();
     } else { // 扫雷
       ctx.strokeStyle = ink;
       ctx.lineWidth = 1.6;
