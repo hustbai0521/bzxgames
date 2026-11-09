@@ -1,4 +1,4 @@
-/* 打字练习：原生文本框保留输入法、选区与移动端键盘支持。 */
+/* 打字练习：逐行原文与输入，保留原生输入法和键盘操作。 */
 (function () {
   "use strict";
   const BZX = window.BZX;
@@ -13,6 +13,10 @@
     let finishedAt = null;
     let composing = false;
     let timer = null;
+    let entered = "";
+    let rows = [];
+    let compact = null;
+    let resultDialog = null;
 
     const page = el("div", "typing-page");
     root.appendChild(page);
@@ -88,28 +92,13 @@
     const progressFill = el("div", "typing-progress-fill");
     progressTrack.appendChild(progressFill); panel.appendChild(progressTrack);
 
-    const readingLabel = el("div", "typing-section-label", "原文  /  阅读并跟打");
+    const readingLabel = el("div", "typing-section-label", "逐行跟打  /  原文在上，输入在下");
     panel.appendChild(readingLabel);
     const reading = el("div", "typing-reading");
-    reading.setAttribute("role", "text");
-    reading.tabIndex = 0;
+    reading.setAttribute("aria-label", "逐行打字练习");
     panel.appendChild(reading);
-    const inputHead = el("div", "typing-input-head");
-    const inputLabel = el("label", "typing-section-label", "在这里输入");
-    inputLabel.htmlFor = "typing-input";
-    inputHead.appendChild(inputLabel);
-    const inputHint = el("span", "typing-input-hint", "支持中文输入法，可退格修改");
-    inputHead.appendChild(inputHint); panel.appendChild(inputHead);
-    const input = el("textarea", "typing-input");
-    input.id = "typing-input";
-    input.placeholder = "从这里开始，计时将在输入时启动…";
-    input.setAttribute("autocomplete", "off");
-    input.setAttribute("autocapitalize", "off");
-    input.setAttribute("spellcheck", "false");
-    input.setAttribute("aria-describedby", "typing-help typing-status");
-    panel.appendChild(input);
     const footer = el("div", "typing-footer");
-    const help = el("p", "typing-help", "按原文输入，包含空格和标点；可在完成前修改。粘贴不可用于练习。");
+    const help = el("p", "typing-help", "在每行原文下方输入，输满自动换行；可退格修改。英文空格以 · 表示，标点也需输入。");
     help.id = "typing-help";
     footer.appendChild(help);
     const status = el("p", "typing-status", "准备好后，开始输入吧。");
@@ -127,7 +116,7 @@
       return String(Math.floor(seconds / 60)).padStart(2, "0") + ":" + String(seconds % 60).padStart(2, "0");
     }
     function updateStats() {
-      const stats = engine.getStats(passage, input.value, elapsed());
+      const stats = engine.getStats(passage, entered, elapsed());
       speedValue.textContent = Math.round(stats.speed) + " " + (language === "zh" ? "字符/分" : "WPM");
       accuracyValue.textContent = Math.round(stats.accuracy) + "%";
       timeValue.textContent = clock(elapsed());
@@ -136,24 +125,62 @@
       progressTrack.setAttribute("aria-valuenow", String(Math.round(Math.min(100, stats.progress))));
       return stats;
     }
-    function renderReading() {
-      const expected = Array.from(passage.text);
-      const actual = Array.from(input.value);
-      const fragment = document.createDocumentFragment();
-      let current = null;
-      expected.forEach((char, index) => {
-        const node = el("span", index < actual.length ? (actual[index] === char ? "typing-correct" : "typing-error") : (index === actual.length && finishedAt === null ? "typing-current" : ""), char);
-        if (index === actual.length) current = node;
-        fragment.appendChild(node);
-      });
-      reading.replaceChildren(fragment);
-      if (current && startedAt !== null) {
-        const currentRect = current.getBoundingClientRect();
-        const readingRect = reading.getBoundingClientRect();
-        if (currentRect.top < readingRect.top || currentRect.bottom > readingRect.bottom) {
-          reading.scrollTop += currentRect.top - readingRect.top - reading.clientHeight / 3;
+    function closeResult() {
+      if (resultDialog) { resultDialog.remove(); resultDialog = null; }
+    }
+    function showResult(stats) {
+      closeResult();
+      const scrim = el("div", "typing-result-scrim");
+      resultDialog = scrim;
+      const confetti = el("div", "typing-confetti");
+      confetti.setAttribute("aria-hidden", "true");
+      for (let i = 0; i < 36; i++) {
+        const piece = el("i", "typing-confetti-piece");
+        piece.style.setProperty("--x", (8 + ((i * 37) % 85)) + "%");
+        piece.style.setProperty("--delay", ((i % 9) * .11) + "s");
+        piece.style.setProperty("--drift", (((i * 43) % 180) - 90) + "px");
+        piece.style.setProperty("--color", ["#ddb876", "#79aa9c", "#d99580", "#b6a7cc"][i % 4]);
+        confetti.appendChild(piece);
+      }
+      for (let burst = 0; burst < 2; burst++) {
+        const firework = el("div", "typing-firework " + (burst ? "typing-firework-right" : "typing-firework-left"));
+        for (let ray = 0; ray < 12; ray++) {
+          const spark = el("i", "typing-firework-spark");
+          spark.style.setProperty("--angle", (ray * 30) + "deg");
+          spark.style.setProperty("--color", ["#f4ca7e", "#b3ddc9", "#f0a28a"][ray % 3]);
+          firework.appendChild(spark);
         }
-      } else if (startedAt === null) reading.scrollTop = 0;
+        confetti.appendChild(firework);
+      }
+      scrim.appendChild(confetti);
+      const box = el("section", "typing-result");
+      box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+      box.setAttribute("aria-labelledby", "typing-result-title");
+      box.appendChild(el("div", "typing-result-mark", "✦"));
+      box.appendChild(el("div", "typing-result-kicker", "A PAGE WELL SPENT"));
+      const title = el("h2", "typing-result-title", "这一篇，完成了！");
+      title.id = "typing-result-title"; box.appendChild(title);
+      box.appendChild(el("p", "typing-result-caption", passage.title + " · " + passage.author));
+      const summary = el("div", "typing-result-metrics");
+      [["平均速度", stats.speed + (language === "zh" ? " 字符/分" : " WPM")], ["准确率", stats.accuracy + "%"], ["用时", clock(elapsed())]].forEach(([label, value]) => {
+        const item = el("div", "typing-result-metric");
+        item.appendChild(el("strong", null, value)); item.appendChild(el("span", null, label)); summary.appendChild(item);
+      });
+      box.appendChild(summary);
+      const buttons = el("div", "typing-result-actions");
+      const dismiss = el("button", "typing-result-dismiss", "查看练习"); dismiss.type = "button";
+      const again = el("button", "typing-result-again", "再练一次"); again.type = "button";
+      dismiss.addEventListener("click", () => { closeResult(); restart.focus(); });
+      again.addEventListener("click", () => { closeResult(); reset(); rows[0].input.focus(); });
+      scrim.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { event.preventDefault(); closeResult(); restart.focus(); }
+        if (event.key === "Tab") {
+          event.preventDefault();
+          (document.activeElement === again ? dismiss : again).focus();
+        }
+      });
+      buttons.appendChild(dismiss); buttons.appendChild(again); box.appendChild(buttons); scrim.appendChild(box);
+      root.appendChild(scrim); again.focus();
     }
     function stopTimer() { if (timer !== null) { clearInterval(timer); timer = null; } }
     function begin() {
@@ -166,36 +193,123 @@
         }, 250);
       }
     }
-    function processInput() {
+    function focusRow(index, atEnd) {
+      const row = rows[Math.max(0, Math.min(index, rows.length - 1))];
+      if (!row) return;
+      row.input.focus({ preventScroll: true });
+      if (atEnd) row.input.setSelectionRange(row.input.value.length, row.input.value.length);
+      const rect = row.wrap.getBoundingClientRect(), container = reading.getBoundingClientRect();
+      if (rect.bottom > container.bottom || rect.top < container.top) {
+        reading.scrollTop += rect.top - container.top - 20;
+      }
+    }
+    function syncRows() {
+      const chars = Array.from(entered);
+      rows.forEach((row) => {
+        const text = chars.slice(row.start, row.start + row.length).join("");
+        if (row.input.value !== text) {
+          const active = document.activeElement === row.input;
+          const start = row.input.selectionStart, end = row.input.selectionEnd;
+          row.input.value = text;
+          if (active) row.input.setSelectionRange(Math.min(start, text.length), Math.min(end, text.length));
+        }
+        row.input.readOnly = finishedAt !== null || row.start > chars.length;
+        row.count = Array.from(text).length;
+        Array.from(row.source.children).forEach((node, offset) => {
+          const index = row.start + offset;
+          node.className = (index < chars.length ? (chars[index] === row.chars[offset] ? "typing-correct" : "typing-error") : (index === chars.length && finishedAt === null ? "typing-current" : "")) + (row.chars[offset] === " " ? " typing-space" : "");
+        });
+      });
+    }
+    function buildRows() {
+      compact = window.innerWidth <= 600;
+      const limit = language === "zh" ? (compact ? 12 : 23) : (compact ? 22 : 40);
+      const chars = Array.from(passage.text);
+      reading.replaceChildren(); rows = [];
+      for (let start = 0; start < chars.length;) {
+        let end = Math.min(start + limit, chars.length);
+        if (language === "en" && end < chars.length && chars[end - 1] !== " " && chars[end] !== " ") {
+          const split = chars.slice(start, end).lastIndexOf(" ");
+          if (split >= Math.floor(limit / 2)) end = start + split + 1;
+        }
+        if (language === "en" && chars[end] === " ") end++;
+        const row = { start, length: end - start, chars: chars.slice(start, end), count: 0 };
+        row.wrap = el("div", "typing-line");
+        row.source = el("div", "typing-line-source");
+        row.source.setAttribute("aria-hidden", "true");
+        row.source.setAttribute("aria-hidden", "true");
+        row.chars.forEach((char) => row.source.appendChild(el("span", "", char === " " ? "·" : char)));
+        row.wrap.appendChild(row.source);
+        row.input = el("input", "typing-line-input");
+        row.input.type = "text";
+        row.input.placeholder = start === 0 ? "在这里开始输入…" : "";
+        row.input.setAttribute("aria-label", "第 " + (rows.length + 1) + " 行，原文：" + row.chars.join(""));
+        row.input.setAttribute("aria-describedby", "typing-help typing-status");
+        row.input.setAttribute("autocomplete", "off");
+        row.input.setAttribute("autocapitalize", "off");
+        row.input.setAttribute("spellcheck", "false");
+        const rowIndex = rows.length;
+        row.input.addEventListener("focus", () => {
+          if (finishedAt === null && row.start > Array.from(entered).length) {
+            focusRow(rows.findIndex((r) => r.start + r.length > Array.from(entered).length), true);
+          }
+        });
+        row.input.addEventListener("beforeinput", (event) => {
+          if (finishedAt !== null || composing) return;
+          if (event.inputType === "deleteContentBackward" && rowIndex > 0 && row.input.selectionStart === 0 && row.input.selectionEnd === 0) {
+            event.preventDefault();
+            const current = Array.from(entered);
+            current.splice(row.start - 1, 1); entered = current.join("");
+            syncRows(); updateStats(); focusRow(rowIndex - 1, false);
+            const previousRow = rows[rowIndex - 1];
+            const caret = Array.from(previousRow.input.value).slice(0, row.start - previousRow.start - 1).join("").length;
+            previousRow.input.setSelectionRange(caret, caret);
+          } else if (event.inputType && event.inputType.indexOf("insert") === 0 && !event.isComposing) begin();
+        });
+        row.input.addEventListener("compositionstart", () => { composing = true; begin(); });
+        row.input.addEventListener("compositionend", () => { composing = false; processInput(row, rowIndex); resize(); });
+        row.input.addEventListener("input", (event) => { if (!event.isComposing) processInput(row, rowIndex); });
+        ["paste", "drop"].forEach((name) => row.input.addEventListener(name, (event) => {
+          event.preventDefault(); status.textContent = "请手动输入原文，完成一次打字练习。";
+        }));
+        row.wrap.appendChild(row.input); reading.appendChild(row.wrap); rows.push(row);
+        start = end;
+      }
+      syncRows();
+    }
+    function processInput(row, rowIndex) {
       if (composing || finishedAt !== null) return;
-      const chars = Array.from(input.value);
+      const previous = Array.from(entered);
+      const chars = previous.slice(0, row.start).concat(Array.from(row.input.value), previous.slice(row.start + row.count));
       const total = Array.from(passage.text).length;
-      if (chars.length > total) input.value = chars.slice(0, total).join("");
-      if (input.value && startedAt === null) begin();
+      const changed = chars.slice(0, total).join("") !== entered;
+      const caretAtEnd = row.input.selectionStart === row.input.value.length;
+      entered = chars.slice(0, total).join("");
+      if (entered && startedAt === null) begin();
       let stats = updateStats();
       if (stats.complete) {
         finishedAt = performance.now();
         stopTimer();
-        input.readOnly = true;
         stats = updateStats();
         status.textContent = "练习完成！平均速度 " + Math.round(stats.speed) + (language === "zh" ? " 字符/分" : " WPM") + "，准确率 " + Math.round(stats.accuracy) + "%";
       }
-      renderReading();
+      syncRows();
+      if (stats.complete) showResult(stats);
+      else if (changed && caretAtEnd && Array.from(row.input.value).length === row.length && rowIndex + 1 < rows.length) focusRow(rowIndex + 1, false);
     }
     function reset() {
+      closeResult();
       stopTimer(); startedAt = null; finishedAt = null; composing = false;
-      input.value = ""; input.readOnly = false;
+      entered = "";
       status.textContent = "准备好后，开始输入吧。";
       workTitle.textContent = passage.title;
       workAuthor.textContent = passage.author + " · 节选";
-      reading.setAttribute("aria-label", "练习原文：" + passage.text);
-      inputHint.textContent = language === "zh" ? "支持中文输入法，可退格修改" : "区分大小写，可退格修改";
       root.setAttribute("data-language", language);
       zhBtn.classList.toggle("active", language === "zh");
       enBtn.classList.toggle("active", language === "en");
       zhBtn.setAttribute("aria-pressed", String(language === "zh"));
       enBtn.setAttribute("aria-pressed", String(language === "en"));
-      updateStats(); renderReading();
+      updateStats(); buildRows(); reading.scrollTop = 0;
     }
     function chooseLanguage(next) {
       if (language === next) return;
@@ -219,17 +333,22 @@
       passage = engine.passages.find((item) => item.id === select.value) || passage;
       reset();
     });
-    restart.addEventListener("click", () => { reset(); input.focus(); });
-    input.addEventListener("beforeinput", (event) => {
-      if (event.inputType && event.inputType.indexOf("insert") === 0 && !event.isComposing) begin();
-    });
-    input.addEventListener("compositionstart", () => { composing = true; begin(); });
-    input.addEventListener("compositionend", () => { composing = false; processInput(); });
-    input.addEventListener("input", (event) => { if (!event.isComposing) processInput(); });
-    ["paste", "drop"].forEach((name) => input.addEventListener(name, (event) => {
-      event.preventDefault(); status.textContent = "请手动输入原文，完成一次打字练习。";
-    }));
+    restart.addEventListener("click", () => { reset(); focusRow(0, false); });
+    function resize() {
+      if (composing || compact === (window.innerWidth <= 600)) return;
+      const active = rows.findIndex((row) => row.input === document.activeElement);
+      const caret = active < 0 ? null : rows[active].start + Array.from(rows[active].input.value.slice(0, rows[active].input.selectionStart)).length;
+      buildRows();
+      if (caret !== null && finishedAt === null) {
+        let index = rows.findIndex((row) => caret < row.start + row.length);
+        if (index < 0) index = rows.length - 1;
+        focusRow(index, false);
+        const offset = Array.from(rows[index].input.value).slice(0, Math.max(0, caret - rows[index].start)).join("").length;
+        rows[index].input.setSelectionRange(offset, offset);
+      }
+    }
+    window.addEventListener("resize", resize);
     fillOptions(); reset();
-    return () => stopTimer();
+    return () => { stopTimer(); closeResult(); window.removeEventListener("resize", resize); };
   };
 })();

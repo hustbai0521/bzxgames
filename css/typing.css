@@ -48,21 +48,51 @@
 .typing-progress-text { font-variant-numeric: tabular-nums; }
 .typing-progress-track { height: 5px; margin: 8px 0 22px; border-radius: 5px; background: rgba(92, 115, 102, .13); overflow: hidden; }
 .typing-progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--typing-accent); transition: width .18s; }
-.typing-reading { position: relative; height: 150px; overflow-y: auto; margin-top: 9px; padding: 18px 20px; border: 1px solid rgba(110, 125, 113, .14); border-radius: 11px; background: rgba(255,255,255,.56); color: #849089; font-family: "Noto Serif SC", "Songti SC", SimSun, Georgia, serif; font-size: 18px; line-height: 2; letter-spacing: .045em; white-space: pre-wrap; overflow-wrap: anywhere; }
-.typing-screen[data-language="en"] .typing-reading { font-family: Georgia, "Times New Roman", serif; letter-spacing: .015em; line-height: 1.9; }
+.typing-reading { position: relative; max-height: 360px; overflow-y: auto; margin-top: 9px; padding: 12px 16px; border: 1px solid rgba(110, 125, 113, .14); border-radius: 11px; background: rgba(255,255,255,.56); }
+.typing-line { padding: 7px 0 10px; border-bottom: 1px solid rgba(110, 125, 113, .13); }
+.typing-line:last-child { border-bottom: 0; }
+.typing-line-source, .typing-line-input { display: block; width: 100%; font-family: "Courier New", "Microsoft YaHei", monospace; font-size: 18px; line-height: 1.7; letter-spacing: 0; white-space: pre; }
+.typing-line-source { color: #849089; }
+.typing-line-input { height: 34px; padding: 0; border: 0; border-bottom: 1px solid rgba(100, 125, 110, .22); border-radius: 0; outline: none; background: transparent; color: var(--typing-ink); }
+.typing-line-input:focus { border-bottom: 2px solid var(--typing-accent); }
+.typing-line-input:read-only { opacity: .6; }
+.typing-line-input::placeholder { color: #a6afa8; font-family: inherit; font-size: 13px; }
 .typing-correct { color: var(--typing-ink); }
 .typing-error { color: #a53f39; background: rgba(190, 80, 70, .12); text-decoration: underline; text-decoration-color: #bc6860; text-underline-offset: 4px; }
+.typing-space { color: #afbdb2; }
+.typing-space.typing-error { color: #a53f39; }
+.typing-space.typing-correct { color: var(--typing-ink); }
 .typing-current { background: rgba(87, 132, 112, .16); box-shadow: inset 2px 0 var(--typing-accent); }
-.typing-input-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 19px 0 9px; }
-.typing-input-hint { color: var(--typing-muted); font-size: 11px; }
-.typing-input { display: block; width: 100%; min-height: 108px; resize: vertical; padding: 14px 17px; border: 1px solid rgba(93, 123, 106, .25); border-radius: 10px; outline: none; background: rgba(255,255,255,.82); color: var(--typing-ink); font-family: inherit; font-size: 16px; line-height: 1.8; }
-.typing-input:focus { border-color: var(--typing-accent); box-shadow: 0 0 0 3px rgba(90, 128, 106, .13); }
-.typing-input::placeholder { color: #a6afa8; }
-.typing-input:read-only { background: rgba(239, 243, 236, .8); }
 .typing-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 11px; font-size: 11px; line-height: 1.6; }
 .typing-help { color: var(--typing-muted); }
 .typing-status { color: var(--typing-accent); font-weight: 700; }
 .typing-note { margin: 14px 3px 0; color: white; font-size: 11px; line-height: 1.6; text-shadow: 0 1px 5px rgba(0,0,0,.65); }
+.typing-result-scrim { position: absolute; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; background: rgba(20, 35, 33, .63); }
+.typing-result { position: relative; z-index: 2; width: min(100%, 430px); padding: 31px 27px 26px; text-align: center; color: var(--typing-ink); border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: var(--typing-paper); box-shadow: 0 24px 80px rgba(0,0,0,.25); animation: typing-result-in .4s ease-out both; }
+.typing-result-mark { display: grid; place-items: center; margin: 0 auto 12px; width: 54px; height: 54px; border-radius: 50%; background: rgba(208, 173, 106, .18); color: #b88b4c; font-size: 28px; }
+.typing-result-kicker { color: var(--typing-accent); font-size: 10px; font-weight: 700; letter-spacing: .2em; }
+.typing-result-title { margin: 9px 0 4px; font: 600 26px/1.4 "Songti SC", SimSun, serif; }
+.typing-result-caption { color: var(--typing-muted); font-size: 12px; }
+.typing-result-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin: 24px 0; padding: 16px 3px; border-radius: 12px; background: rgba(96, 125, 109, .08); }
+.typing-result-metric strong, .typing-result-metric span { display: block; }
+.typing-result-metric strong { font-size: clamp(13px, 3.5vw, 19px); white-space: nowrap; }
+.typing-result-metric span { margin-top: 5px; color: var(--typing-muted); font-size: 11px; }
+.typing-result-actions { display: flex; gap: 10px; }
+.typing-result-actions button { flex: 1; padding: 12px 8px; border-radius: 9px; font-size: 13px; font-weight: 700; }
+.typing-result-dismiss { border: 1px solid rgba(100, 125, 110, .25); }
+.typing-result-again { color: #fff; background: var(--typing-accent); }
+.typing-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.typing-confetti-piece { position: absolute; top: -20px; left: var(--x); width: 8px; height: 15px; border-radius: 2px; background: var(--color); opacity: 0; animation: typing-confetti-fall 2.9s var(--delay) ease-in forwards; }
+.typing-confetti-piece:nth-child(3n) { width: 7px; height: 7px; border-radius: 50%; }
+.typing-firework { position: absolute; top: 27%; width: 1px; height: 1px; }
+.typing-firework-left { left: 15%; }
+.typing-firework-right { right: 15%; top: 38%; }
+.typing-firework-spark { position: absolute; width: 4px; height: 12px; border-radius: 5px; background: var(--color); opacity: 0; transform: rotate(var(--angle)); animation: typing-spark 1.3s .2s ease-out both; }
+.typing-firework-right .typing-firework-spark { animation-delay: .65s; }
+@keyframes typing-spark { 0% { opacity: 1; transform: rotate(var(--angle)) translateY(0) scale(.35); } 60% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--angle)) translateY(-85px) scale(1); } }
+@keyframes typing-confetti-fall { 0% { opacity: 0; transform: translate3d(0,-5vh,0) rotate(0); } 12% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translate3d(var(--drift),105vh,0) rotate(650deg); } }
+@keyframes typing-result-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .typing-confetti-piece, .typing-firework-spark { animation: none; } .typing-result { animation: none; } }
 @media (max-width: 600px) {
   .typing-page { padding: 12px 15px 25px; }
   .typing-brand { font-size: 9px; letter-spacing: .1em; }
@@ -76,6 +106,6 @@
   .typing-work-title { font-size: 21px; }
   .typing-metric { padding: 10px 7px; }
   .typing-metric-value { font-size: 14px; }
-  .typing-reading { height: 140px; padding: 13px 14px; font-size: 16px; }
-  .typing-input-hint { font-size: 10px; }
+  .typing-reading { max-height: 310px; padding: 10px 12px; }
+  .typing-line-source, .typing-line-input { font-size: 16px; }
 }
