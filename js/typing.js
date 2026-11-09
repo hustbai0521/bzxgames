@@ -12,6 +12,7 @@
     let startedAt = null;
     let finishedAt = null;
     let composing = false;
+    let compositionTimer = null;
     let timer = null;
     let entered = "";
     let rows = [];
@@ -66,6 +67,18 @@
     restart.type = "button";
     heading.appendChild(restart);
     panel.appendChild(heading);
+    const translationButton = el("button", "typing-translation-toggle", "查看中文译文");
+    translationButton.type = "button";
+    translationButton.setAttribute("aria-expanded", "false");
+    translationButton.setAttribute("aria-controls", "typing-translation");
+    panel.appendChild(translationButton);
+    const translation = el("div", "typing-translation");
+    translation.id = "typing-translation";
+    translation.hidden = true;
+    translation.appendChild(el("div", "typing-translation-label", "中文参考译文 · AI 生成"));
+    const translationText = el("p", "typing-translation-text");
+    translation.appendChild(translationText);
+    panel.appendChild(translation);
 
     const metrics = el("div", "typing-metrics");
     function metric(label) {
@@ -183,6 +196,9 @@
       root.appendChild(scrim); again.focus();
     }
     function stopTimer() { if (timer !== null) { clearInterval(timer); timer = null; } }
+    function cancelCompositionTimer() {
+      if (compositionTimer !== null) { clearTimeout(compositionTimer); compositionTimer = null; }
+    }
     function begin() {
       if (startedAt === null && finishedAt === null) {
         startedAt = performance.now();
@@ -217,7 +233,8 @@
         row.count = Array.from(text).length;
         Array.from(row.source.children).forEach((node, offset) => {
           const index = row.start + offset;
-          node.className = (index < chars.length ? (chars[index] === row.chars[offset] ? "typing-correct" : "typing-error") : (index === chars.length && finishedAt === null ? "typing-current" : "")) + (row.chars[offset] === " " ? " typing-space" : "");
+          const style = (index < chars.length ? (chars[index] === row.chars[offset] ? "typing-correct" : "typing-error") : (index === chars.length && finishedAt === null ? "typing-current" : "")) + (row.chars[offset] === " " ? " typing-space" : "");
+          if (node.className !== style) node.className = style;
         });
       });
     }
@@ -236,7 +253,6 @@
         const row = { start, length: end - start, chars: chars.slice(start, end), count: 0 };
         row.wrap = el("div", "typing-line");
         row.source = el("div", "typing-line-source");
-        row.source.setAttribute("aria-hidden", "true");
         row.source.setAttribute("aria-hidden", "true");
         row.chars.forEach((char) => row.source.appendChild(el("span", "", char === " " ? "·" : char)));
         row.wrap.appendChild(row.source);
@@ -266,9 +282,16 @@
             previousRow.input.setSelectionRange(caret, caret);
           } else if (event.inputType && event.inputType.indexOf("insert") === 0 && !event.isComposing) begin();
         });
-        row.input.addEventListener("compositionstart", () => { composing = true; begin(); });
-        row.input.addEventListener("compositionend", () => { composing = false; processInput(row, rowIndex); resize(); });
-        row.input.addEventListener("input", (event) => { if (!event.isComposing) processInput(row, rowIndex); });
+        row.input.addEventListener("compositionstart", () => { cancelCompositionTimer(); composing = true; begin(); });
+        row.input.addEventListener("compositionend", () => {
+          composing = false;
+          // Some input methods commit their final value in an input event after compositionend.
+          cancelCompositionTimer();
+          compositionTimer = setTimeout(() => { compositionTimer = null; processInput(row, rowIndex); resize(); }, 0);
+        });
+        row.input.addEventListener("input", (event) => {
+          if (!event.isComposing) { cancelCompositionTimer(); processInput(row, rowIndex); resize(); }
+        });
         ["paste", "drop"].forEach((name) => row.input.addEventListener(name, (event) => {
           event.preventDefault(); status.textContent = "请手动输入原文，完成一次打字练习。";
         }));
@@ -284,6 +307,7 @@
       const total = Array.from(passage.text).length;
       const changed = chars.slice(0, total).join("") !== entered;
       const caretAtEnd = row.input.selectionStart === row.input.value.length;
+      const caretIndex = Math.min(total, row.start + Array.from(row.input.value.slice(0, row.input.selectionStart)).length);
       entered = chars.slice(0, total).join("");
       if (entered && startedAt === null) begin();
       let stats = updateStats();
@@ -295,15 +319,28 @@
       }
       syncRows();
       if (stats.complete) showResult(stats);
-      else if (changed && caretAtEnd && Array.from(row.input.value).length === row.length && rowIndex + 1 < rows.length) focusRow(rowIndex + 1, false);
+      else if (changed && caretAtEnd && caretIndex >= row.start + row.length && rowIndex + 1 < rows.length) {
+        let target = rows.findIndex((candidate) => caretIndex < candidate.start + candidate.length);
+        if (target < 0) target = rows.length - 1;
+        focusRow(target, false);
+        const offset = Array.from(rows[target].input.value).slice(0, caretIndex - rows[target].start).join("").length;
+        rows[target].input.setSelectionRange(offset, offset);
+      }
     }
     function reset() {
       closeResult();
+      cancelCompositionTimer();
       stopTimer(); startedAt = null; finishedAt = null; composing = false;
       entered = "";
       status.textContent = "准备好后，开始输入吧。";
+      workKicker.textContent = "TODAY’S READING  /  " + (passage.scope ? "经典全文" : "经典节选");
       workTitle.textContent = passage.title;
-      workAuthor.textContent = passage.author + " · 节选";
+      workAuthor.textContent = passage.author + " · " + (passage.scope || "节选") + " · " + Array.from(passage.text).length + " 字符";
+      translationButton.hidden = !passage.translation;
+      translationButton.textContent = "查看中文译文";
+      translationButton.setAttribute("aria-expanded", "false");
+      translation.hidden = true;
+      translationText.textContent = passage.translation || "";
       root.setAttribute("data-language", language);
       zhBtn.classList.toggle("active", language === "zh");
       enBtn.classList.toggle("active", language === "en");
@@ -320,7 +357,7 @@
     function fillOptions() {
       select.replaceChildren();
       engine.passages.filter((item) => item.language === language).forEach((item) => {
-        const option = el("option", null, item.title + " · " + item.author);
+        const option = el("option", null, item.title + " · " + item.author + "（" + (item.scope || "节选") + "）");
         option.value = item.id;
         select.appendChild(option);
       });
@@ -329,6 +366,12 @@
     }
     zhBtn.addEventListener("click", () => chooseLanguage("zh"));
     enBtn.addEventListener("click", () => chooseLanguage("en"));
+    translationButton.addEventListener("click", () => {
+      const open = translation.hidden;
+      translation.hidden = !open;
+      translationButton.textContent = open ? "收起中文译文" : "查看中文译文";
+      translationButton.setAttribute("aria-expanded", String(open));
+    });
     select.addEventListener("change", () => {
       passage = engine.passages.find((item) => item.id === select.value) || passage;
       reset();
@@ -349,6 +392,6 @@
     }
     window.addEventListener("resize", resize);
     fillOptions(); reset();
-    return () => { stopTimer(); closeResult(); window.removeEventListener("resize", resize); };
+    return () => { cancelCompositionTimer(); stopTimer(); closeResult(); window.removeEventListener("resize", resize); };
   };
 })();

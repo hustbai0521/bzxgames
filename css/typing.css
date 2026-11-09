@@ -40,6 +40,11 @@
 .typing-work-author { color: var(--typing-muted); font-size: 12px; }
 .typing-restart { flex: none; padding: 9px 13px; border: 1px solid rgba(105,125,115,.27); border-radius: 8px; color: var(--typing-ink); font-size: 12px; }
 .typing-restart:hover { background: rgba(100, 125, 110, .09); }
+.typing-translation-toggle { margin: -4px 0 16px; padding: 7px 12px; border: 1px solid rgba(105,125,115,.27); border-radius: 8px; color: var(--typing-accent); font-size: 12px; font-weight: 700; }
+.typing-translation-toggle:hover { background: rgba(100, 125, 110, .09); }
+.typing-translation { margin: 0 0 18px; padding: 14px 16px; border-left: 3px solid var(--typing-accent); border-radius: 0 9px 9px 0; background: rgba(96,125,109,.07); }
+.typing-translation-label { margin-bottom: 6px; color: var(--typing-accent); font-size: 11px; font-weight: 700; }
+.typing-translation-text { color: var(--typing-ink); font-size: 13px; line-height: 1.9; }
 .typing-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .typing-metric { min-width: 0; padding: 12px 15px; border-radius: 10px; background: rgba(96, 125, 109, .065); }
 .typing-metric-label { color: var(--typing-muted); font-size: 11px; }

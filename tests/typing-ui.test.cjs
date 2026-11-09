@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 function screen() {
   let now = 0, nextTimer = 1;
-  const timers = new Map(), listeners = {};
+  const timers = new Map(), timeouts = new Map(), listeners = {};
   const document = { activeElement: null };
   class Element {
     constructor(tag, className = "", text = "") {
@@ -32,7 +32,9 @@ function screen() {
   const window = { BZX, innerWidth: 800, addEventListener: (n, f) => listeners[n] = f, removeEventListener: n => delete listeners[n] };
   const context = { window, document, performance: { now: () => now },
     setInterval: fn => { const id = nextTimer++; timers.set(id, fn); return id; },
-    clearInterval: id => timers.delete(id) };
+    clearInterval: id => timers.delete(id),
+    setTimeout: fn => { const id = nextTimer++; timeouts.set(id, fn); return id; },
+    clearTimeout: id => timeouts.delete(id) };
   for (const filename of ["typing-engine.js", "typing.js"]) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js", filename), "utf8"), context);
   }
@@ -50,7 +52,9 @@ function screen() {
   return { root, window, document, listeners, find, findAll, input: i => findAll("typing-line-input")[i],
     zh: modes[0], en: modes[1], restart: find("typing-restart"), progress: find("typing-progress-text"),
     status: find("typing-status"), speed: values[0], accuracy: values[1], time: values[2], engine: BZX.TypingEngine, unmount, enter,
-    advance(ms) { now += ms; for (const fn of [...timers.values()]) fn(); }, timerCount: () => timers.size };
+    advance(ms) { now += ms; for (const fn of [...timers.values()]) fn(); },
+    flushTimeouts() { const pending = [...timeouts.values()]; timeouts.clear(); pending.forEach(fn => fn()); },
+    timerCount: () => timers.size };
 }
 
 test("IME candidates do not count until committed, including at a line break", () => {
@@ -61,14 +65,67 @@ test("IME candidates do not count until committed, including at a line break", (
   s.advance(1000);
   assert.match(s.progress.textContent, /^0 \/ /);
   field.fire("compositionend");
+  s.flushTimeouts();
   assert.match(s.progress.textContent, /^1 \/ /);
   assert.equal(s.accuracy.textContent, "100%");
   field.fire("compositionstart");
   field.value = first.slice(0, 25); field.selectionStart = field.selectionEnd = field.value.length;
   field.fire("compositionend");
+  s.flushTimeouts();
   assert.equal(s.input(0).value, first.slice(0, 23));
   assert.equal(s.input(1).value, first.slice(23, 25));
   assert.equal(s.document.activeElement, s.input(1));
+  assert.equal(s.input(1).selectionStart, 2);
+  s.unmount();
+});
+
+test("IME final input after compositionend commits once and moves to the right caret", () => {
+  const s = screen(), text = s.engine.passages[0].text, field = s.input(0);
+  field.fire("compositionstart");
+  field.value = text.slice(0, 22); field.selectionStart = field.selectionEnd = 22;
+  field.fire("compositionend");
+  s.enter(field, text.slice(0, 25), { isComposing: false });
+  s.flushTimeouts();
+  assert.equal(s.input(0).value, text.slice(0, 23));
+  assert.equal(s.input(1).value, text.slice(23, 25));
+  assert.equal(s.document.activeElement, s.input(1));
+  assert.equal(s.input(1).selectionStart, 2);
+  s.enter(s.input(1), text.slice(23, 26));
+  assert.match(s.progress.textContent, /^26 \/ /);
+  assert.equal(s.accuracy.textContent, "100%");
+  s.unmount();
+});
+
+test("a multi-character commit advances across multiple lines without losing caret position", () => {
+  const s = screen(), text = s.engine.passages[0].text;
+  s.enter(s.input(0), text.slice(0, 50));
+  assert.equal(s.document.activeElement, s.input(2));
+  assert.equal(s.input(2).value, text.slice(46, 50));
+  assert.equal(s.input(2).selectionStart, 4);
+  s.enter(s.input(2), text.slice(46, 51));
+  assert.match(s.progress.textContent, /^51 \/ /);
+  assert.equal(s.accuracy.textContent, "100%");
+  s.unmount();
+});
+
+test("English translation opens and closes without resetting the practice", () => {
+  const s = screen();
+  assert.equal(s.find("typing-translation-toggle").hidden, true);
+  s.en.fire("click");
+  const button = s.find("typing-translation-toggle"), panel = s.find("typing-translation");
+  assert.equal(button.hidden, false);
+  assert.equal(panel.hidden, true);
+  s.enter(s.input(0), "It");
+  button.fire("click");
+  assert.equal(panel.hidden, false);
+  assert.match(s.find("typing-translation-text").textContent, /真理/);
+  assert.equal(button.attributes["aria-expanded"], "true");
+  assert.match(s.progress.textContent, /^2 \/ /);
+  button.fire("click");
+  assert.equal(panel.hidden, true);
+  assert.equal(s.input(0).value, "It");
+  s.zh.fire("click");
+  assert.equal(button.hidden, true);
   s.unmount();
 });
 
@@ -146,6 +203,22 @@ test("completion freezes statistics, shows result and restarts from the dialog",
   assert.equal(s.time.textContent, "00:00");
   assert.equal(s.document.activeElement, s.input(0));
   s.unmount();
+});
+
+test("both full poems can be completed line by line", () => {
+  for (const id of ["changhen", "pipa"]) {
+    const s = screen(), select = s.find("typing-select");
+    select.value = id; select.fire("change");
+    const text = s.engine.passages.find(p => p.id === id).text;
+    for (let i = 0, offset = 0; offset < text.length; i++) {
+      const count = s.findAll("typing-line-source")[i].children.length;
+      s.enter(s.input(i), text.slice(offset, offset + count));
+      offset += count;
+    }
+    assert.ok(s.find("typing-result"), id);
+    assert.equal(s.accuracy.textContent, "100%", id);
+    s.unmount();
+  }
 });
 
 test("language switch and viewport resize preserve or reset progress appropriately", () => {

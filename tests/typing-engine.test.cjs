@@ -8,16 +8,30 @@ const context = { window: { BZX: {} } };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/typing-engine.js"), "utf8"), context);
 const { passages, getStats } = context.window.BZX.TypingEngine;
 
-test("each language has three identifiable public-domain passages of practical length", () => {
+test("each language has identifiable works, with translations for English passages", () => {
   for (const language of ["zh", "en"]) {
     const items = passages.filter((p) => p.language === language);
-    assert.equal(items.length, 3);
-    assert.equal(new Set(items.map((p) => p.id)).size, 3);
+    assert.ok(items.length >= 3);
+    assert.equal(new Set(items.map((p) => p.id)).size, items.length);
     for (const item of items) {
       assert.ok(item.title && item.author && item.sourceUrl);
-      assert.ok(Array.from(item.text).length >= 80 && Array.from(item.text).length <= 400);
+      assert.ok(Array.from(item.text).length >= 80);
+      if (language === "en") assert.ok(item.translation);
     }
   }
+});
+
+test("both long poems are complete, and Pipa includes its preface", () => {
+  const changhen = passages.find(p => p.id === "changhen");
+  const pipa = passages.find(p => p.id === "pipa");
+  assert.ok(changhen.text.startsWith("汉皇重色思倾国"));
+  assert.ok(changhen.text.endsWith("此恨绵绵无绝期。"));
+  assert.equal((changhen.text.match(/[\u4e00-\u9fff]/g) || []).length, 840);
+  assert.ok(pipa.text.startsWith("元和十年"));
+  assert.ok(pipa.text.endsWith("江州司马青衫湿。"));
+  const poem = pipa.text.slice(pipa.text.indexOf("浔阳江头夜送客"));
+  assert.equal((poem.match(/[\u4e00-\u9fff]/g) || []).length, 616);
+  assert.ok(passages.find(p => p.id === "tengwang").text.includes("落霞与孤鹜齐飞"));
 });
 
 test("Chinese average speed counts correct Unicode characters and punctuation", () => {
