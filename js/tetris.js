@@ -132,6 +132,7 @@
     state.next = rest.shift();
     state.queue = rest;
     state.score = score;
+    const previousBest = state.best;
     state.best = Math.max(state.best, score);
     state.lines = lines;
     state.level = level;
@@ -140,7 +141,7 @@
     state.clearedRows = fullRows;
     state.clearId += fullRows.length ? 1 : 0;
     state.dropInterval = Math.max(90, 600 - (level - 1) * 65);
-    if (state.score > state.best || over) BZX.store.set("tetrisBest", state.best);
+    if (state.best > previousBest || over) BZX.store.set("tetrisBest", state.best);
   }
 
   const actions = {
@@ -282,11 +283,11 @@
 
     /* controls */
     const controls = el("div", "tetris-controls");
-    const btnLeft = holdButton("◀", "左移", true, () => actions.moveLeft(state) && renderBoard());
-    const btnDown = holdButton("▼", "软降", true, () => { actions.softDrop(state); renderBoard(); });
-    const btnRight = holdButton("▶", "右移", true, () => actions.moveRight(state) && renderBoard());
-    const btnRotate = holdButton("⟳", "旋转", false, () => { actions.rotate(state); renderBoard(); });
-    const btnHard = holdButton("⇓", "硬降", false, () => { actions.hardDrop(state); renderBoard(); }, palette.secondary);
+    const btnLeft = holdButton("◀", "左移", true, () => performAction(actions.moveLeft));
+    const btnDown = holdButton("▼", "软降", true, () => performAction(actions.softDrop));
+    const btnRight = holdButton("▶", "右移", true, () => performAction(actions.moveRight));
+    const btnRotate = holdButton("⟳", "旋转", false, () => performAction(actions.rotate));
+    const btnHard = holdButton("⇓", "硬降", false, () => performAction(actions.hardDrop), palette.secondary);
     [btnLeft, btnDown, btnRight, btnRotate, btnHard].forEach((b) => controls.appendChild(b));
     col.appendChild(controls);
     col.appendChild(spacer(10));
@@ -431,17 +432,25 @@
 
     /* game loop */
     let timer = null;
+    function performAction(action) {
+      if (state.status !== "PLAYING") return;
+      action(state);
+      renderBoard();
+      renderScores();
+      if (state.status === "OVER") {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        showResultDialog();
+      }
+    }
     function startLoop() {
       if (timer) { clearTimeout(timer); timer = null; }
       if (state.status !== "PLAYING") return;
       timer = setTimeout(function run() {
         if (state.status !== "PLAYING") { timer = null; return; }
-        actions.tick(state);
-        renderBoard();
-        renderScores();
+        performAction(actions.tick);
         if (state.status === "OVER") {
           timer = null;
-          showResultDialog();
           return;
         }
         timer = setTimeout(run, state.dropInterval);
@@ -524,16 +533,17 @@
       if (!root.isConnected) return;
       if (e.repeat && (e.key === " " || e.key === "ArrowUp" || e.key === "x" || e.key === "X")) return;
       switch (e.key) {
-        case "ArrowLeft": case "a": case "A": e.preventDefault(); actions.moveLeft(state); renderBoard(); break;
-        case "ArrowRight": case "d": case "D": e.preventDefault(); actions.moveRight(state); renderBoard(); break;
-        case "ArrowDown": case "s": case "S": e.preventDefault(); actions.softDrop(state); renderBoard(); break;
-        case "ArrowUp": case "x": case "X": case "w": case "W": e.preventDefault(); actions.rotate(state); renderBoard(); break;
-        case " ": e.preventDefault(); actions.hardDrop(state); renderBoard(); break;
+        case "ArrowLeft": case "a": case "A": e.preventDefault(); performAction(actions.moveLeft); break;
+        case "ArrowRight": case "d": case "D": e.preventDefault(); performAction(actions.moveRight); break;
+        case "ArrowDown": case "s": case "S": e.preventDefault(); performAction(actions.softDrop); break;
+        case "ArrowUp": case "x": case "X": case "w": case "W": e.preventDefault(); performAction(actions.rotate); break;
+        case " ": e.preventDefault(); performAction(actions.hardDrop); break;
         case "p": case "P":
           if (state.status === "PLAYING") pause();
           else if (state.status === "PAUSED") resume();
           break;
         case "r": case "R":
+          if (state.status === "OVER") break;
           Object.assign(state, newGame(BZX.store.get("tetrisBest", 0)));
           renderAll();
           startLoop();

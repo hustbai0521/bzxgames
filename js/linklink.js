@@ -297,6 +297,8 @@
       board.style.width = cell * (COLS + 2) + "px";
       board.style.height = cell * (ROWS + 2) + "px";
       const dpr = window.devicePixelRatio || 1;
+      connector.style.width = cell * (COLS + 2) + "px";
+      connector.style.height = cell * (ROWS + 2) + "px";
       connector.width = cell * (COLS + 2) * dpr;
       connector.height = cell * (ROWS + 2) * dpr;
     }
@@ -353,19 +355,26 @@
     let lastClearId = 0;
     let lastShuffles = 0;
     let connectorStop = null;
+    function clearConnector() {
+      if (connectorStop) { connectorStop(); connectorStop = null; }
+      const ctx = connector.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, connector.width, connector.height);
+    }
     function startConnector() {
-      if (connectorStop) connectorStop();
+      clearConnector();
       const path = state.matchedPath;
       if (!path) return;
-      const dpr = window.devicePixelRatio || 1;
       const ctx = connector.getContext("2d");
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const start = performance.now();
       connectorStop = BZX.animLoop(
         () => {
           const p = (performance.now() - start) / 480;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, connector.width, connector.height);
-          if (p >= 1) return;
+          if (p >= 1) { clearConnector(); return; }
+          const dpr = window.devicePixelRatio || 1;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           const alpha = 1 - p;
           const points = path.map(([x, y]) => ({ x: (x + 1.5) * cell, y: (y + 1.5) * cell }));
           ctx.lineCap = "round";
@@ -420,6 +429,7 @@
       }
     });
     BZX.sfxButton(shufflePill, () => {
+      clearConnector();
       state = reshuffle(state);
       lastShuffles = state.shuffles;
       BZX.toast(root, "重排完成，找找新的配对吧");
@@ -427,6 +437,7 @@
       renderHint();
     });
     BZX.sfxButton(restartPill, () => {
+      clearConnector();
       state = newGame();
       lastClearId = 0;
       lastShuffles = 0;
@@ -445,6 +456,7 @@
         confirm: {
           label: "再来一局",
           onClick: () => {
+            clearConnector();
             state = newGame();
             lastClearId = 0;
             lastShuffles = 0;

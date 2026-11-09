@@ -149,6 +149,8 @@
   function restart() {
     state.previous = null;
     state.board = newGame();
+    state.score = 0;
+    state.canUndo = false;
     state.moveId++;
     state.gameOver = false;
     state.won = false;
@@ -319,6 +321,7 @@
       const result = move(state.board, direction);
       if (!result.moved) return false;
       moving = true;
+      const animationMoveId = state.moveId;
       BZX.clear(tileLayer);
       const { cell, gap } = cellMetrics();
       const startX = {};
@@ -326,6 +329,7 @@
       const startTime = performance.now();
       const stopTween = BZX.tween(0, 1, 150, BZX.easeInOut,
         (p) => {
+          if (state.moveId !== animationMoveId) return;
           BZX.clear(tileLayer);
           result.motions.forEach((m) => {
             const fx = (m.from % 4) + ((m.to % 4) - (m.from % 4)) * p;
@@ -357,7 +361,9 @@
       const probe = move(state.board, direction);
       if (!probe.moved) return;
       if (state.gameOver || (state.won && !state.keepPlaying)) return;
+      const moveId = state.moveId;
       animateMove(direction, (result) => {
+        if (state.moveId !== moveId) return;
         state.previous = { board: state.board, score: state.score };
         const prevBoard = state.board;
         state.board = addRandomTile(result.board);

@@ -160,3 +160,15 @@ test("repeated rotate-and-drop games always make progress", () => run(`
     assert.equal(state.status, "OVER");
   }
 `));
+
+test("a blocked next spawn ends the game after each kind of drop", () => run(`
+  for (const action of [actions.softDrop, actions.hardDrop, actions.tick]) {
+    const state = newGame(0);
+    state.status = "PLAYING";
+    state.falling = spawn("O");
+    state.next = "O";
+    state.board[2 * WIDTH + state.falling.x] = 1;
+    action(state);
+    assert.equal(state.status, "OVER");
+  }
+`));
